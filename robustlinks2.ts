@@ -1,91 +1,226 @@
-// robustlinks2.ts
-// @author Yorick Chollet <yorick.chollet@gmail.com>
-// @author Harihar Shankar <hariharshankar@gmail.com>
-// @author Shawn M. Jones <jones.shawn.m@gmail.com>
-// @author Dylan O'Connor <dylankconnor@gmail.com>
-// @version 3.0.0
-// License can be obtained at http://mementoweb.github.io/SiteStory/license.html 
+/** robustlinks2.ts
+ *
+ * @author Yorick Chollet <yorick.chollet@gmail.com>
+ * @author Harihar Shankar <hariharshankar@gmail.com>
+ * @author Shawn M. Jones <jones.shawn.m@gmail.com>
+ * @author Dylan O'Connor <dylankconnor@gmail.com>
+ * @version 3.0.0
+ * License can be obtained at http://mementoweb.github.io/SiteStory/license.html
+ * Determining what is a URL. In this case, either a relative path or a HTTP/HTTPS scheme.
+ *
+*/
 
-// Determining what is a URL. In this case, either a relative path or a HTTP/HTTPS scheme.
-
+/**
+ * Interface defining the configuration options for RobustLinksV2.
+ * All properties are optional as they will have default values set in the constructor.
+ */
 interface RobustLinksConfig {
-    id: string;
-    urimPattern: string; 
-    bannerElementLocation: string;
-    bannerLogoLocation: string; 
-    showBanner: boolean;
-    debug: boolean;
+    id?: string;
+    urimPattern?: string;
+    debug?: boolean;
+}
+
+/**
+ * Defines the accepted formats for data-versiondate and snapshot datetimes.
+ * - YYYY-MM-DD (ISO8601 date)
+ * - YYYY-MM-DDThh:mm:ssZ (ISO8601 datetime UTC)
+ * - YYYYMMDD (Web Archive URI date)
+ * - YYYYMMDDhhmmss (Web Archive URI datetime)
+ */
+type RobustLinkDatetimeString = string; // Validation handled by parseDatetime function
+
+/**
+ * Represents a single snapshot entry within the data-versionurl attribute.
+ */
+interface RobustLinkSnapshot {
+    /** The URI of the snapshot. Must be absolute. */
+    uri: string;
+    /** The datetime the snapshot was created, if provided. Interpreted as noon UTC if date-only. */
+    datetime?: RobustLinkDatetimeString;
+}
+
+/**
+ * Represents the raw HTML data- attributes used for a Robust Link.
+ * These are the strings directly read from the DOM.
+ */
+interface RobustLinkRawAttributes {
+    href: string;
+    'data-originalurl'?: string;
+    'data-versiondate'?: string;
+    'data-versionurl'?: string;
+}
+
+/**
+ * A more structured and parsed representation of a Robust Link after validation.
+ */
+interface ParsedRobustLink {
+    /** The default link target URI. */
+    href: string;
+    /** The URI of the resource that motivates the Robust Link. Always absolute. */
+    originalUrl: string;
+    /** The intended linking datetime, parsed into a Date object (UTC). */
+    versionDate: Date;
+    /** An array of parsed snapshot URIs and their datetimes. */
+    versionSnapshots: RobustLinkSnapshot[];
+    /** The original HTML text content of the <a> tag. */
+    linkText?: string;
 }
 
 
-class RobustLinksV2 {
-    private config: RobustLinksConfig;
-    private exclusions: string[];
+/**
+ * The `RobustLinksV2` class provides functionality for managing and configuring
+ * robust linking behavior within an application. It includes utilities for
+ * validating URLs, managing a list of excluded archive patterns, and parsing
+ * and creating Robust Links based on the specification.
+ *
+ * It can be used as a module to be initialized once and then used throughout
+ * your application to manage robust links.
+ */
+export class RobustLinksV2 {
+    // Internal constants for the module -> Not in the constructor because we want to guarantee imutability
+    private readonly NAME: string = 'RobustLinksV2';
+    private readonly VERSION: string = '3.0.0';
+
+    // Public configurable properties, initialized with defaults
+    public id: string;
+    public urimPattern: string;
+    public debug: boolean;
+
+    // Private properties for internal use
+    private _regexps: {
+        urimPattern: RegExp;
+        absoluteReference: RegExp;
+        bodyEnd: RegExp;
+    };
+    private exclusions: { [key: string]: (url: string) => boolean };
+
 
     /**
-     * Creates a new RobustLinks instance with optional configurations.
-     * 
-     * @param {{id: string, urimPattern: string, bannerElementLocation: string, bannerLogoLocation: string, showBanner: boolean, debug: boolean}} [config]
-     * ^^^^^^^^^^^^^^^^^^^^^
-     * Configuration options
+     * Creates a new RobustLinksV2 instance with optional configurations.
+     * Default values are provided for all configurable properties.
+     *
+     * @param {RobustLinksConfig} [config] - Optional configuration options to override defaults.
      */
-    constructor(config: RobustLinksConfig) {
-        /**
-         * Name of the module. 
-         * 
-         * @type {string}
-         */
-        
-        /**
-         * This list includes base URIs of web archives that rewrite memento urls,
-         * that already robustify links.
-         * 
-         * @type {string[]}
-         */
-        this.exclusions = [
-            "https?://web.archive.org/web/*", // Internet Archive
-            // "https?://wayback.archive-it.org/11112/*", // PRONI
-            "https?://web.archive.bibalex.org/web/*", // Bibliotheca Alexandrina Web Archive
-            "https?://www.webarchive.org.uk/wayback/en/archive/*", // UK Web Archive
-            "https?://langzeitarchivierung.bib-bvb.de/wayback/*,", // Bayerische Staatsbibliothek 
-            "https?://webcitation.org/", // Web Cite
-            "https?://webarchive.loc.gov/all/*", // Library of Congress
-            "https?://wayback.archive-it.org/all/*", // Archive-It (all collection)
-            "https?://wayback.archive-it.org/[0-9]+/*", // Archive-It (any collection), PRONI, NLI
-            "https?://webarchive.parliament.uk/[0-9]+/*", // UK Parliament Web Archive (in pywb frame)
-            "https?://webarchive.parliament.uk/[0-9]+tf_/*", // UK Parliament Web Archive (outside pywb frame)
-            "https?://webarchive.nationalarchives.gov.uk/[0-9]+/*", // UK National Archives Web Archive (in pywb frame)
-            "https?://webarchive.nationalarchives.gov.uk/[0-9]+tf_/*", // UK National Archives Web Archive (outside pywb frame)
-            "https?://archive.li/*", // Archive.Today
-            "https?://archive.vn/*", // Archive.Today
-            "https?://archive.fo/*", // Archive.Today
-            "https?://archive.md/*", // Archive.Today
-            "https?://archive.ph/*", // Archive.Today
-            "https?://archive.today/*", // Archive.Today
-            "https?://archive.is/*", // Archive.Today
-            "https?://waext.banq.qc.ca/wayback/[0-9]+/*", // Bibliothèque et Archives nationale du Québec
-            "https?://haw.nsk.hr/arhiva/*", // Croatian Web Archive
-            "https?://wayback.webarchiv.cz/wayback/[0-9]+/*", // Webarchiv (the Museum of Czech web)
-            "https?://wayback.vefsafn.is/wayback/[0-9]+/*", // Icelandic Web Archive
-            "https?://arquivo.pt/wayback/[0-9]+/*", // Arquivo.pt
-            "https?://arquivo.pt/wayback/[0-9]+if_/*", // Arquivo.pt (outside pywb frame)
-            "https?://perma-archives.org/warc/[0-9]+/*", // Perma.cc (datetime in URI-M)
-            "https?://perma.cc/[0-9A-Z]{4}-[0-9A-Z]{4}/*", // Perma.cc (identifier in URI-M)
-            "https?://wayback.padicat.cat/wayback/[0-9]+/*", // Catalonia Archive
-            "https?://archive.aueb.gr/services/web/[0-9]+/*", // Athens University of Economics and Business (AUEB)
-            "https?://digital.library.yorku.ca/wayback/[0-9]+/*", // York University Libraries
-            "https?://veebiarhiiv.digar.ee/a/[0-9]+/*", // Estonian Archive
-            // "https?://wayback.archive-it.org/10702/*", // National Library of Ireland
-            "https?://webarchive.nrscotland.gov.uk/[0-9]+/*", // National Records of Scotland
-            "https?://nukrobia.nuk.uni-lj.si:8080/wayback/[0-9]+/*", // Slovenian Archive
-            "https?://swap.stanford.edu/[0-9]+/*" // Stanford Web Archive
-        ]
+    constructor(config?: RobustLinksConfig) {
 
         /**
-         * 
-         * 
+         * Identification for the Robust Links instance, name:version
+         * Not intended to be overwritten by a config object
+         *
+         * @type {string}
          */
-        this.config = config;
+        this.id = `${this.NAME}:${this.VERSION}`;
+
+        /**
+         * A local constant computed to dynamically determine the base URL of
+         * the web application that RobustLinks is running on.
+         *
+         * This is an internally derived object and not meant to be overridden.
+         *
+         * @type {string}
+         */
+        const origin = typeof self !== 'undefined' && self.location && self.location.origin ? self.location.origin : '';
+
+        /**
+         * Defines the Uniform Resource Identifier-M Pattern.
+         * This pattern is crucial for identifying and constructing
+         * memento URIs.
+         *
+         * Defaults to a webserver with a predefined memento pathway
+         *
+         * @type {string}
+         */
+        this.urimPattern = `${origin}/memento/<datetime>/<urir>`;
+
+        /**
+         * A private object that holds a collection of functions
+         * each designed to test whether or not a link should be
+         * included or ignored by the RobustLinksV2 system
+         *
+         * @type { [key: string]: (url: string) => boolean }
+         */
+        this.exclusions = {
+            // Converts patterns like "https?://web.archive.org/web/*" into actual RegExp objects.
+            isKnownArchive: (url: string) => {
+                const archivePatterns = [
+                    "https?://web.archive.org/web/",
+                    "https?://web.archive.bibalex.org/web/",
+                    "https?://www.webarchive.org.uk/wayback/en/archive/",
+                    "https?://langzeitarchivierung.bib-bvb.de/wayback/",
+                    "https?://webcitation.org/",
+                    "https?://webarchive.loc.gov/all/",
+                    "https?://wayback.archive-it.org/all/",
+                    "https?://wayback.archive-it.org/[0-9]+/",
+                    "https?://webarchive.parliament.uk/[0-9]+/",
+                    "https?://webarchive.parliament.uk/[0-9]+tf_/",
+                    "https?://webarchive.nationalarchives.gov.uk/[0-9]+/",
+                    "https?://webarchive.nationalarchives.gov.uk/[0-9]+tf_/",
+                    "https?://archive.li/",
+                    "https?://archive.vn/",
+                    "https?://archive.fo/",
+                    "https?://archive.md/",
+                    "https?://archive.ph/",
+                    "https?://archive.today/",
+                    "https?://archive.is/",
+                    "https?://waext.banq.qc.ca/wayback/[0-9]+/",
+                    "https?://haw.nsk.hr/arhiva/",
+                    "https?://wayback.webarchiv.cz/wayback/[0-9]+/",
+                    "https?://wayback.vefsafn.is/wayback/[0-9]+/",
+                    "https?://arquivo.pt/wayback/[0-9]+/",
+                    "https?://arquivo.pt/wayback/[0-9]+if_/",
+                    "https?://perma-archives.org/warc/[0-9]+/",
+                    "https?://perma.cc/[0-9A-Z]{4}-[0-9A-Z]{4}/",
+                    "https?://wayback.padicat.cat/wayback/[0-9]+/",
+                    "https?://archive.aueb.gr/services/web/[0-9]+/",
+                    "https?://digital.library.yorku.ca/wayback/[0-9]+/",
+                    "https?://veebiarhiiv.digar.ee/a/[0-9]+/",
+                    "https?://webarchive.nrscotland.gov.uk/[0-9]+/",
+                    "https?://nukrobia.nuk.uni-lj.si:8080/wayback/[0-9]+/",
+                    "https?://swap.stanford.edu/[0-9]+/"
+                ];
+
+                return archivePatterns.some(pattern => {
+                    // Convert the pattern to a regex, replacing '*' with '.*' and '?' with '.' for wildcards
+                    const regex = new RegExp(pattern.replace(/\*/g, '.*').replace(/\?/g, '.'));
+                    return regex.test(url);
+                });
+            }
+        };
+
+        /**
+         * Whether or not to show debug messages in the console.
+         * Defaults to false.
+         *
+         * @type {boolean}
+         */
+        this.debug = false;
+
+        // Overwrite defaults with any provided configuration
+        if (config instanceof Object) {
+            for (const [key, value] of Object.entries(config)) {
+                // Type assertion to allow dynamic assignment, assuming config keys match public properties
+                if (Object.prototype.hasOwnProperty.call(this, key)) {
+                     (this as any)[key] = value;
+                }
+            }
+        }
+
+        // internal properties
+        /**
+         * This section of the constructor initializes _regexps, a private object that
+         * stores regular expression patterns essential for RobustLinksV2's core functionality.
+         * These patterns are used internally to identify, parse, and manipulate URLs and HTML content.
+         * Not needed at the moment, but could be useful in the FUTURE
+         *
+         * @type {{ urimPattern: RegExp; absoluteReference: RegExp; bodyEnd: RegExp; }}
+         */
+        this._regexps = {
+            urimPattern: new RegExp(`^${this.urimPattern.replace('<datetime>', '(\\d{14})').replace('<urir>', '(.*)')}$`),
+            // This regex will match absolute HTTP/HTTPS URLs in src, href, or content attributes.
+            // It captures: (1) prefix, (2) tag/attribute info, (3) the URL, (4) suffix
+            absoluteReference: new RegExp(`(<(iframe|a|meta|link|script).*?\\s+(src|href|content|url)\\s*=\\s*["']?)(https?:\/\/[^'"\\s]+)(.*?>)`, 'ig'),
+            bodyEnd: new RegExp('<\/(body|html)>', 'i')
+        };
     }
 
     /**
@@ -96,7 +231,7 @@ class RobustLinksV2 {
      * @param url The string to validate.
      * @returns True if it's a valid absolute HTTP/HTTPS URL, false otherwise.
      */
-    private static isValidAbsoluteUrl(url: string): boolean {
+    public static isValidAbsoluteUrl(url: string): boolean {
         try {
             const parsedUrl = new URL(url);
             // Ensure it's http or https protocol and has a non-empty hostname
@@ -107,6 +242,265 @@ class RobustLinksV2 {
         }
     }
 
+    /**
+     * Parses a datetime string according to the Robust Links specification rules.
+     * Handles both ISO8601 and Web Archive URI formats, and correctly interprets
+     * date-only strings as noon UTC.
+     * @param datetimeStr The datetime string to parse.
+     * @returns A Date object representing the parsed datetime, or null if invalid.
+     */
+    public static parseDatetime(datetimeStr: RobustLinkDatetimeString): Date | null {
+        // ISO8601 Date: YYYY-MM-DD
+        const isoDateMatch = datetimeStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (isoDateMatch) {
+            // Interpret as noon UTC
+            return new Date(Date.UTC(
+                parseInt(isoDateMatch[1]), // Year
+                parseInt(isoDateMatch[2]) - 1, // Month (0-indexed)
+                parseInt(isoDateMatch[3]), // Day
+                12, 0, 0, 0 // Noon UTC
+            ));
+        }
 
+        // ISO8601 Datetime: YYYY-MM-DDThh:mm:ssZ
+        const isoDatetimeMatch = datetimeStr.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z$/);
+        if (isoDatetimeMatch) {
+            return new Date(Date.UTC(
+                parseInt(isoDatetimeMatch[1]),
+                parseInt(isoDatetimeMatch[2]) - 1,
+                parseInt(isoDatetimeMatch[3]),
+                parseInt(isoDatetimeMatch[4]),
+                parseInt(isoDatetimeMatch[5]),
+                parseInt(isoDatetimeMatch[6])
+            ));
+        }
+
+        // Web Archive URI Date: YYYYMMDD
+        const waDateMatch = datetimeStr.match(/^(\d{4})(\d{2})(\d{2})$/);
+        if (waDateMatch) {
+            // Interpret as noon UTC
+            return new Date(Date.UTC(
+                parseInt(waDateMatch[1]),
+                parseInt(waDateMatch[2]) - 1,
+                parseInt(waDateMatch[3]),
+                12, 0, 0, 0
+            ));
+        }
+
+        // Web Archive URI Datetime: YYYYMMDDhhmmss
+        const waDatetimeMatch = datetimeStr.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/);
+        if (waDatetimeMatch) {
+            return new Date(Date.UTC(
+                parseInt(waDatetimeMatch[1]),
+                parseInt(waDatetimeMatch[2]) - 1,
+                parseInt(waDatetimeMatch[3]),
+                parseInt(waDatetimeMatch[4]),
+                parseInt(waDatetimeMatch[5]),
+                parseInt(waDatetimeMatch[6])
+            ));
+        }
+
+        return null; // Invalid format
+    }
+
+    /**
+     * Parses the data-versionurl string into an array of RobustLinkSnapshot objects.
+     * @param versionUrlString The raw string value of the data-versionurl attribute.
+     * @returns An array of RobustLinkSnapshot.
+     */
+    public static parseVersionUrl(versionUrlString: string | undefined): RobustLinkSnapshot[] {
+        if (!versionUrlString) {
+            return [];
+        }
+
+        const snapshots: RobustLinkSnapshot[] = [];
+        // Split by space, then filter out empty strings to handle multiple spaces
+        const parts = versionUrlString.split(' ').filter(part => part.length > 0);
+        let i = 0;
+
+        while (i < parts.length) {
+            const uri = parts[i];
+            // Check if the current part is a valid URI
+            if (!RobustLinksV2.isValidAbsoluteUrl(uri)) {
+                // If it's not a valid URI, it might be a malformed datetime or just junk.
+                // We'll skip it and log a warning if debug is enabled.
+                // For a robust implementation, you might want to throw an error here,
+                // or have a stricter ABNF-based parser.
+                console.warn(`RobustLinksV2: Skipping invalid URI in data-versionurl: "${uri}"`);
+                i++;
+                continue;
+            }
+
+            // Check if the next part looks like a datetime
+            const nextPart = parts[i + 1];
+            const isDatetime = nextPart && RobustLinksV2.parseDatetime(nextPart) !== null;
+
+            if (isDatetime) {
+                snapshots.push({ uri, datetime: nextPart });
+                i += 2; // Consume URI and datetime
+            } else {
+                snapshots.push({ uri });
+                i += 1; // Consume only URI
+            }
+        }
+        return snapshots;
+    }
+
+    /**
+     * Takes an object representing the raw HTML attributes of an <a> element
+     * and returns a parsed and validated ParsedRobustLink object.
+     *
+     * This method implements the logic for handling missing attributes as per
+     * Section 3.5 "Missing attribute information" of the specification.
+     *
+     * @param rawAttributes The raw attributes from an HTML <a> element.
+     * @param defaultLinkText Optional text content of the <a> tag, used for the `linkText` property.
+     * @returns A ParsedRobustLink object.
+     * @throws {Error} if required attributes are missing or invalid, even after attempting defaults.
+     */
+    public parseRobustLink(rawAttributes: RobustLinkRawAttributes, defaultLinkText?: string): ParsedRobustLink {
+        let { href, 'data-originalurl': originalUrl, 'data-versiondate': versionDateStr, 'data-versionurl': versionUrlStr } = rawAttributes;
+
+        // Apply default for data-originalurl if missing (Section 3.5)
+        if (!originalUrl && href) {
+            if (this.debug) {
+                console.log(`RobustLinksV2: data-originalurl missing, defaulting to href: ${href}`);
+            }
+            originalUrl = href; // Use href as data-originalurl if not provided
+        }
+
+        // --- Basic validation of required attributes after defaulting ---
+        if (!href) {
+            throw new Error("Robust Link parsing failed: 'href' attribute is missing and required.");
+        }
+        if (!originalUrl) {
+            throw new Error("Robust Link parsing failed: 'data-originalurl' (or default from href) is missing and required.");
+        }
+        if (!versionDateStr) {
+            // For data-versiondate, the spec allows client applications to attempt to determine a plausible value
+            // if not provided, e.g., document creation/last modification date.
+            // For this draft, we will currently treat it as a hard error if not present,
+            // or you could add a fallback (e.g., to current date, though this is less precise).
+            // For now, let's make it throw if not provided, to keep it explicit.
+            throw new Error("Robust Link parsing failed: 'data-versiondate' attribute is missing and required.");
+        }
+
+        // --- URI Absolute Validation ---
+        if (!RobustLinksV2.isValidAbsoluteUrl(href)) {
+            throw new Error(`Invalid href: "${href}" is not an absolute URI.`);
+        }
+        if (!RobustLinksV2.isValidAbsoluteUrl(originalUrl)) {
+            throw new Error(`Invalid data-originalurl: "${originalUrl}" is not an absolute URI.`);
+        }
+
+        // --- Parse and Validate data-versiondate ---
+        const parsedVersionDate = RobustLinksV2.parseDatetime(versionDateStr);
+        if (!parsedVersionDate) {
+            throw new Error(`Invalid data-versiondate format: "${versionDateStr}". Must follow ISO8601 or Web Archive URI datetime formats.`);
+        }
+
+        // --- Parse and Validate data-versionurl ---
+        const parsedVersionSnapshots = RobustLinksV2.parseVersionUrl(versionUrlStr);
+        // `parseVersionUrl` already handles basic URI validity for snapshots.
+        // If it encounters malformed parts, it warns and skips.
+
+        return {
+            href,
+            originalUrl,
+            versionDate: parsedVersionDate,
+            versionSnapshots: parsedVersionSnapshots,
+            linkText: defaultLinkText
+        };
+    }
+    
+    /**
+     * Discovers all robust links within a given HTML element (or the entire document body)
+     * and parses them into ParsedRobustLink objects.
+     * Invalid robust links found will be logged as errors and skipped.
+     *
+     * @param rootElement The HTML element to search within. Defaults to `document.body`.
+     * @returns An array of ParsedRobustLink objects found.
+     */
+    public findAndParseRobustLinks(rootElement?: HTMLElement): ParsedRobustLink[] {
+        const links: ParsedRobustLink[] = [];
+        const scope = rootElement || document.body;
+        const anchorElements = scope.querySelectorAll('a[data-originalurl][data-versiondate]'); // Select only potential robust links
+
+        anchorElements.forEach(anchor => {
+            const href = anchor.getAttribute('href');
+            const dataOriginalUrl = anchor.getAttribute('data-originalurl');
+            const dataVersionDate = anchor.getAttribute('data-versiondate');
+            const dataVersionUrl = anchor.getAttribute('data-versionurl');
+            const linkText = anchor.textContent || undefined; // Get link text, default to undefined if empty
+
+            const rawAttributes: RobustLinkRawAttributes = {
+                href: href || '', // Ensure href is always a string for the interface
+                'data-originalurl': dataOriginalUrl || undefined,
+                'data-versiondate': dataVersionDate || undefined,
+                'data-versionurl': dataVersionUrl || undefined
+            };
+
+            try {
+                const parsedLink = this.parseRobustLink(rawAttributes, linkText);
+                links.push(parsedLink);
+            } catch (error: any) {
+                console.error(`RobustLinksV2: Could not parse robust link for href "${href || 'N/A'}". Error: ${error.message}`);
+                // Continue to the next link
+            }
+        });
+
+        return links;
+    }
+
+    /**
+     * Generates an HTML <a> tag string for a given ParsedRobustLink object.
+     * This can be used to programmatically create Robust Links for insertion into the DOM.
+     * @param parsedLink The ParsedRobustLink object to convert into HTML.
+     * @returns A string representing the HTML <a> tag.
+     */
+    public createRobustLinkHtml(parsedLink: ParsedRobustLink): string {
+        // Format versionDate to YYYY-MM-DD for data-versiondate attribute
+        // Note: Date.toISOString() gives YYYY-MM-DDTHH:mm:ss.sssZ, we only want the date part.
+        const versionDateStr = parsedLink.versionDate.toISOString().split('T')[0];
+
+        let versionUrlAttr = '';
+        if (parsedLink.versionSnapshots && parsedLink.versionSnapshots.length > 0) {
+            // Format versionSnapshots into the space-separated string for data-versionurl
+            const snapshotParts = parsedLink.versionSnapshots.map(s => {
+                // Encode URI components to ensure valid HTML attribute value, especially if URIs contain spaces or special chars
+                return `${s.uri}${s.datetime ? ` ${s.datetime}` : ''}`;
+            });
+            versionUrlAttr = ` data-versionurl="${snapshotParts.join(' ')}"`;
+        }
+
+        // Use linkText if provided, otherwise default to href
+        const linkText = parsedLink.linkText || parsedLink.href;
+
+        // Construct the HTML string. Ensure attributes are properly quoted.
+        return `<a href="${parsedLink.href}" data-originalurl="${parsedLink.originalUrl}" data-versiondate="${versionDateStr}"${versionUrlAttr}>${linkText}</a>`;
+    }
+
+    /**
+     * Determines if a given URL is considered an "archive URL" based on predefined patterns.
+     * This uses the `isKnownArchive` exclusion rule.
+     * @param url The URL to check.
+     * @returns True if the URL matches a known archive pattern, false otherwise.
+     */
+    public isArchiveUrl(url: string): boolean {
+        return this.exclusions.isKnownArchive(url);
+    }
+
+    /**
+     * Logs a debug message to the console if `this.debug` is true.
+     * @param message The message to log.
+     * @param optionalParams Optional additional parameters to log.
+     */
+    private logDebug(message: string, ...optionalParams: any[]): void {
+        if (this.debug) {
+            console.log(`[${this.NAME} DEBUG] ${message}`, ...optionalParams);
+        }
+    }
+
+    // --- Further methods could be added here based on specification needs ---
 
 }

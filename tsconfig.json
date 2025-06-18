@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "es2017",
+    "lib": ["es2017", "dom"], 
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "outDir": "./dist" 
+  },
+  "include": [
+    "robustlinks2.ts",
+    "__tests__/**/*.ts" 
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"          
+  ]
+}
