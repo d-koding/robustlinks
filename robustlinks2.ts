@@ -180,8 +180,23 @@ export class RobustLinksV2 {
                 ];
 
                 return archivePatterns.some(pattern => {
-                    // Convert the pattern to a regex, replacing '*' with '.*' and '?' with '.' for wildcards
-                    const regex = new RegExp(pattern.replace(/\*/g, '.*').replace(/\?/g, '.'));
+                    let processedPattern = pattern;
+
+                    // 1. Escape literal dots. All dots in your provided patterns are literal,
+                    //    meaning they should match a period character, not "any character".
+                    processedPattern = processedPattern.replace(/\./g, '\\.');
+
+                    // 2. The `https?` part already correctly uses `?` as a quantifier.
+                    //    No specific replacement needed for `?` if it's meant as a quantifier.
+                    //    DO NOT use `replace(/\?/g, '.')` as it changes its meaning.
+
+                    // 3. For parts like `[0-9]+` or `[0-9A-Z]{4}-[0-9A-Z]{4}`,
+                    //    the `[`, `]`, `{`, `}`, `+`, `-` inside these are intended to be regex metacharacters
+                    //    and should be passed as is to `new RegExp`.
+                    //    `processedPattern` should already have them.
+
+                    const regex = new RegExp(`^${processedPattern}`, 'i'); // Anchor to start, case-insensitive
+
                     return regex.test(url);
                 });
             }
@@ -364,7 +379,7 @@ export class RobustLinksV2 {
         // Apply default for data-originalurl if missing (Section 3.5)
         if (!originalUrl && href) {
             if (this.debug) {
-                console.log(`RobustLinksV2: data-originalurl missing, defaulting to href: ${href}`);
+                this.logDebug(`RobustLinksV2: data-originalurl missing, defaulting to href: ${href}`);
             }
             originalUrl = href; // Use href as data-originalurl if not provided
         }

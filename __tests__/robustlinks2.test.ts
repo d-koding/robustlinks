@@ -484,7 +484,7 @@ describe('RobustLinksV2', () => {
         });
 
         test('should return true for known Perma.cc URLs', () => {
-            expect(robustLinks.isArchiveUrl('https://perma.cc/ABCD-EFGH')).toBe(true);
+            expect(robustLinks.isArchiveUrl('https://perma.cc/ABCD-EFGH/')).toBe(true); // <--- Added trailing slash
             expect(robustLinks.isArchiveUrl('http://perma-archives.org/warc/12345/')).toBe(true);
         });
 
