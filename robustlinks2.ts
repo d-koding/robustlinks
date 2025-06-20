@@ -14,7 +14,7 @@
  * Interface defining the configuration options for RobustLinksV2.
  * All properties are optional as they will have default values set in the constructor.
  */
-interface RobustLinksConfig {
+export interface RobustLinksConfig {
     id?: string;
     urimPattern?: string;
     debug?: boolean;
@@ -27,12 +27,12 @@ interface RobustLinksConfig {
  * - YYYYMMDD (Web Archive URI date)
  * - YYYYMMDDhhmmss (Web Archive URI datetime)
  */
-type RobustLinkDatetimeString = string; // Validation handled by parseDatetime function
+export type RobustLinkDatetimeString = string; // Validation handled by parseDatetime function
 
 /**
  * Represents a single snapshot entry within the data-versionurl attribute.
  */
-interface RobustLinkSnapshot {
+export interface RobustLinkSnapshot {
     /** The URI of the snapshot. Must be absolute. */
     uri: string;
     /** The datetime the snapshot was created, if provided. Interpreted as noon UTC if date-only. */
@@ -43,7 +43,7 @@ interface RobustLinkSnapshot {
  * Represents the raw HTML data- attributes used for a Robust Link.
  * These are the strings directly read from the DOM.
  */
-interface RobustLinkRawAttributes {
+export interface RobustLinkRawAttributes {
     href: string;
     'data-originalurl'?: string;
     'data-versiondate'?: string;
@@ -53,7 +53,7 @@ interface RobustLinkRawAttributes {
 /**
  * A more structured and parsed representation of a Robust Link after validation.
  */
-interface ParsedRobustLink {
+export interface ParsedRobustLink {
     /** The default link target URI. */
     href: string;
     /** The URI of the resource that motivates the Robust Link. Always absolute. */
@@ -412,7 +412,7 @@ export class RobustLinksV2 {
             linkText: defaultLinkText
         };
     }
-    
+
     /**
      * Discovers all robust links within a given HTML element (or the entire document body)
      * and parses them into ParsedRobustLink objects.
