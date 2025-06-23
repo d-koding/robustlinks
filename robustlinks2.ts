@@ -239,6 +239,48 @@ export class RobustLinksV2 {
     }
 
     /**
+     * Generates a Memento URI (URI-M) using the configured `urimPattern`.
+     * This method creates a URI that points to a specific historical version
+     * of an original resource at a given datetime. It's often a "TimeGate" URI
+     * used to negotiate the best available memento.
+     *
+     * @param originalUrl The URI of the original resource (URI-R). Must be an absolute HTTP/HTTPS URL.
+     * @param dateTime The desired historical datetime for the memento.
+     * @returns A string representing the Memento URI.
+     * @throws {Error} if the originalUrl is not a valid absolute HTTP/HTTPS URL.
+     */
+    public createMementoUri(originalUrl: string, dateTime: Date): string {
+        if (!RobustLinksV2.isValidAbsoluteUrl(originalUrl)) {
+            this.logDebug(`RobustLinksV2: originalUrl "${originalUrl}" is not a valid absolute HTTP/HTTPS URL for Memento URI creation.`);
+            throw new Error(`Invalid originalUrl: "${originalUrl}" is not an absolute HTTP/HTTPS URI.`);
+        }
+
+        const datetimeString = this.formatDateTime(dateTime);
+
+        // Replace placeholders in the urimPattern
+        // We need to encode the originalUrl to ensure it's safe for a URI path segment
+        // However, standard Memento pattern often uses the *raw* URI-R after the datetime
+        // unless the URI-R itself contains path-unfriendly characters or needs to be treated as a query.
+        // For simplicity and common Memento conventions, let's assume direct insertion for now.
+        // If the urimPattern includes query parameters for urir, then encodeURIComponent might be needed for urir.
+        // Given the pattern `/memento/<datetime>/<urir>`, <urir> is a path segment.
+        // Path segments should be URI-encoded, but Memento systems often expect the original URL.
+        // Let's use encodeURI for the full URI to be safer, or manually encode components if needed.
+        // The most common implementation is just placing the originalUrl as is.
+
+        // Per RFC 7089 (Memento protocol), the URI-R in the URI-M is the original URI itself,
+        // without further encoding, as it's part of the path, but the server handles its parsing.
+        // So, direct replacement is usually fine.
+        const mementoUri = this.urimPattern
+            .replace('<datetime>', datetimeString)
+            .replace('<urir>', originalUrl);
+
+        this.logDebug(`RobustLinksV2: Created Memento URI: ${mementoUri} for originalUrl: ${originalUrl} at datetime: ${dateTime.toISOString()}`);
+
+        return mementoUri;
+    }
+
+    /**
      * Checks if a string is a valid absolute HTTP or HTTPS URL.
      * This method is marked as `static` because it doesn't depend on any instance properties
      * and can be called directly on the class (e.g., `RobustLinksV2.isValidAbsoluteUrl(...)`).
@@ -505,6 +547,25 @@ export class RobustLinksV2 {
         return this.exclusions.isKnownArchive(url);
     }
 
+    // ------ INTERNAL FUNCTIONS --------
+
+    /**
+     * Formats a Date object into the 14-digit YYYYMMDDhhmmss UTC string required for Memento URIs.
+     * This is a helper for createMementoUri.
+     * @param date The Date object to format.
+     * @returns A 14-digit datetime string (e.g., "20231026143000").
+     */
+    private formatDateTime(date: Date): string {
+        const year = date.getUTCFullYear();
+        const month = String(date.getUTCMonth() + 1).padStart(2, '0'); // Month is 0-indexed
+        const day = String(date.getUTCDate()).padStart(2, '0');
+        const hours = String(date.getUTCHours()).padStart(2, '0');
+        const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+        const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+
+        return `${year}${month}${day}${hours}${minutes}${seconds}`;
+    }
+
     /**
      * Logs a debug message to the console if `this.debug` is true.
      * @param message The message to log.
@@ -516,6 +577,5 @@ export class RobustLinksV2 {
         }
     }
 
-    // --- Further methods could be added here based on specification needs ---
 
 }

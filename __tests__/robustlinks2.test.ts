@@ -484,7 +484,7 @@ describe('RobustLinksV2', () => {
         });
 
         test('should return true for known Perma.cc URLs', () => {
-            expect(robustLinks.isArchiveUrl('https://perma.cc/ABCD-EFGH/')).toBe(true); // <--- Added trailing slash
+            expect(robustLinks.isArchiveUrl('https://perma.cc/ABCD-EFGH/')).toBe(true);
             expect(robustLinks.isArchiveUrl('http://perma-archives.org/warc/12345/')).toBe(true);
         });
 
@@ -497,7 +497,7 @@ describe('RobustLinksV2', () => {
         test('should return false for non-archive URLs', () => {
             expect(robustLinks.isArchiveUrl('http://example.com')).toBe(false);
             expect(robustLinks.isArchiveUrl('https://google.com')).toBe(false);
-            expect(robustLinks.isArchiveUrl('http://mysite.com/archive')).toBe(false); // Not matching the pattern
+            expect(robustLinks.isArchiveUrl('http://mysite.com/archive')).toBe(false);
         });
 
         test('should handle variations in protocol (http vs https) correctly', () => {
