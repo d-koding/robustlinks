@@ -1,13 +1,19 @@
 /** robustlinks2.ts
  *
+ * @overview A general purpose library for handling Robust Link data.
+ * Provides tools necessary for creating, augmenting, and parsing Robust
+ * Links. 
+ * 
+ * Currently assumes another client will handle specific data fetching
+ * methods for TimeGates and TimeMaps. 
+ * 
  * @author Yorick Chollet <yorick.chollet@gmail.com>
  * @author Harihar Shankar <hariharshankar@gmail.com>
  * @author Shawn M. Jones <jones.shawn.m@gmail.com>
  * @author Dylan O'Connor <dylankconnor@gmail.com>
  * @version 3.0.0
  * License can be obtained at http://mementoweb.github.io/SiteStory/license.html
- * Determining what is a URL. In this case, either a relative path or a HTTP/HTTPS scheme.
- *
+ * 
 */
 
 /**
@@ -256,17 +262,6 @@ export class RobustLinksV2 {
         }
 
         const datetimeString = this.formatDateTime(dateTime);
-
-        // Replace placeholders in the urimPattern
-        // We need to encode the originalUrl to ensure it's safe for a URI path segment
-        // However, standard Memento pattern often uses the *raw* URI-R after the datetime
-        // unless the URI-R itself contains path-unfriendly characters or needs to be treated as a query.
-        // For simplicity and common Memento conventions, let's assume direct insertion for now.
-        // If the urimPattern includes query parameters for urir, then encodeURIComponent might be needed for urir.
-        // Given the pattern `/memento/<datetime>/<urir>`, <urir> is a path segment.
-        // Path segments should be URI-encoded, but Memento systems often expect the original URL.
-        // Let's use encodeURI for the full URI to be safer, or manually encode components if needed.
-        // The most common implementation is just placing the originalUrl as is.
 
         // Per RFC 7089 (Memento protocol), the URI-R in the URI-M is the original URI itself,
         // without further encoding, as it's part of the path, but the server handles its parsing.
@@ -564,6 +559,107 @@ export class RobustLinksV2 {
         const seconds = String(date.getUTCSeconds()).padStart(2, '0');
 
         return `${year}${month}${day}${hours}${minutes}${seconds}`;
+    }
+
+    /**
+     * Updates an existing HTML <a> element to become a Robust Link by setting
+     * its data-originalurl, data-versiondate, and optionally data-versionurl attributes.
+     * It can also optionally update the href attribute.
+     *
+     * @param anchorElement The HTMLAnchorElement to update.
+     * @param options An object containing the necessary data to make the link robust.
+     * - originalUrl: The URI of the resource that motivates the Robust Link. Must be absolute.
+     * - versionDate: The intended linking datetime.
+     * - versionSnapshots: Optional array of parsed snapshot URIs and their datetimes.
+     * - newHref: Optional string to set as the new href attribute for the anchor.
+     * @throws {Error} if inputs are invalid or required data is missing.
+     */
+    public updateAnchorToRobustLink(
+        anchorElement: HTMLAnchorElement,
+        options: {
+            originalUrl: string;
+            versionDate: Date;
+            versionSnapshots?: RobustLinkSnapshot[];
+            newHref?: string;
+        }
+    ): void {
+        if (!anchorElement || !(anchorElement instanceof HTMLAnchorElement)) {
+            throw new Error("Invalid anchorElement provided. Must be an HTMLAnchorElement.");
+        }
+        if (!RobustLinksV2.isValidAbsoluteUrl(options.originalUrl)) {
+            throw new Error(`Invalid originalUrl: "${options.originalUrl}" is not an absolute HTTP/HTTPS URI.`);
+        }
+        if (!(options.versionDate instanceof Date) || isNaN(options.versionDate.getTime())) {
+            throw new Error("Invalid versionDate provided. Must be a valid Date object.");
+        }
+
+        anchorElement.setAttribute('data-originalurl', options.originalUrl);
+
+        // Format versionDate to YYYY-MM-DD for data-versiondate attribute
+        const versionDateStr = options.versionDate.toISOString().split('T')[0];
+        anchorElement.setAttribute('data-versiondate', versionDateStr);
+
+        if (options.versionSnapshots && options.versionSnapshots.length > 0) {
+            const snapshotParts = options.versionSnapshots.map(s => `${s.uri}${s.datetime ? ` ${s.datetime}` : ''}`);
+            anchorElement.setAttribute('data-versionurl', snapshotParts.join(' '));
+        } else {
+            anchorElement.removeAttribute('data-versionurl');
+        }
+
+        if (options.newHref) {
+            if (RobustLinksV2.isValidAbsoluteUrl(options.newHref)) {
+                anchorElement.setAttribute('href', options.newHref);
+            } else {
+                this.logDebug(`RobustLinksV2: newHref "${options.newHref}" is not a valid absolute HTTP/HTTPS URL. Href not updated.`);
+            }
+        }
+
+        this.logDebug(`RobustLinksV2: Updated <a> tag with href "${anchorElement.href}" to robust link.`);
+    }
+
+    /**
+     * Iterates through all <a> tags matching a given CSS selector and transforms them
+     * into robust links using data provided by a callback function.
+     *
+     * @param selector The CSS selector string (e.g., 'a', 'a.my-class') to select elements.
+     * @param dataProducer A callback function that receives each HTMLAnchorElement and its
+     * index, and returns an object containing the originalUrl, versionDate,
+     * and optional versionSnapshots and newHref for that link.
+     * If the function returns null or undefined, the link is skipped.
+     * @param rootElement The HTML element to search within. Defaults to `document.body`.
+     * @returns An array of HTMLAnchorElements that were successfully made robust.
+     */
+    public makeAllLinksRobust(
+        selector: string,
+        dataProducer: (anchor: HTMLAnchorElement, index: number) => {
+            originalUrl: string;
+            versionDate: Date;
+            versionSnapshots?: RobustLinkSnapshot[];
+            newHref?: string;
+        } | null | undefined,
+        rootElement?: HTMLElement
+    ): HTMLAnchorElement[] {
+        this.logDebug(`RobustLinksV2: Attempting to make all links matching selector "${selector}" robust.`);
+        const updatedLinks: HTMLAnchorElement[] = [];
+        const scope = rootElement || document.body;
+        const anchorElements = scope.querySelectorAll<HTMLAnchorElement>(selector);
+
+        anchorElements.forEach((anchor, index) => {
+            try {
+                const linkData = dataProducer(anchor, index);
+                if (linkData) {
+                    this.updateAnchorToRobustLink(anchor, linkData);
+                    updatedLinks.push(anchor);
+                } else {
+                    this.logDebug(`RobustLinksV2: Skipping link "${anchor.href}" as dataProducer returned null/undefined.`);
+                }
+            } catch (error: any) {
+                console.error(`RobustLinksV2: Error making link with href "${anchor.href}" robust. Error: ${error.message}`);
+            }
+        });
+
+        this.logDebug(`RobustLinksV2: Successfully made ${updatedLinks.length} links robust.`);
+        return updatedLinks;
     }
 
     /**
