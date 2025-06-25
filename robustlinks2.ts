@@ -226,7 +226,7 @@ export class RobustLinksV2 {
             }
         }
 
-        // internal properties
+        // ----INTERNAL PROPERTIES-----
         /**
          * This section of the constructor initializes _regexps, a private object that
          * stores regular expression patterns essential for RobustLinksV2's core functionality.
@@ -243,6 +243,8 @@ export class RobustLinksV2 {
             bodyEnd: new RegExp('<\/(body|html)>', 'i')
         };
     }
+
+    // ---- EXTERNAL FUNCTIONS ----
 
     /**
      * Generates a Memento URI (URI-M) using the configured `urimPattern`.
@@ -542,25 +544,6 @@ export class RobustLinksV2 {
         return this.exclusions.isKnownArchive(url);
     }
 
-    // ------ INTERNAL FUNCTIONS --------
-
-    /**
-     * Formats a Date object into the 14-digit YYYYMMDDhhmmss UTC string required for Memento URIs.
-     * This is a helper for createMementoUri.
-     * @param date The Date object to format.
-     * @returns A 14-digit datetime string (e.g., "20231026143000").
-     */
-    private formatDateTime(date: Date): string {
-        const year = date.getUTCFullYear();
-        const month = String(date.getUTCMonth() + 1).padStart(2, '0'); // Month is 0-indexed
-        const day = String(date.getUTCDate()).padStart(2, '0');
-        const hours = String(date.getUTCHours()).padStart(2, '0');
-        const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-        const seconds = String(date.getUTCSeconds()).padStart(2, '0');
-
-        return `${year}${month}${day}${hours}${minutes}${seconds}`;
-    }
-
     /**
      * Updates an existing HTML <a> element to become a Robust Link by setting
      * its data-originalurl, data-versiondate, and optionally data-versionurl attributes.
@@ -660,6 +643,25 @@ export class RobustLinksV2 {
 
         this.logDebug(`RobustLinksV2: Successfully made ${updatedLinks.length} links robust.`);
         return updatedLinks;
+    }
+
+    // ------ INTERNAL FUNCTIONS --------
+
+    /**
+     * Formats a Date object into the 14-digit YYYYMMDDhhmmss UTC string required for Memento URIs.
+     * This is a helper for createMementoUri.
+     * @param date The Date object to format.
+     * @returns A 14-digit datetime string (e.g., "20231026143000").
+     */
+    private formatDateTime(date: Date): string {
+        const year = date.getUTCFullYear();
+        const month = String(date.getUTCMonth() + 1).padStart(2, '0'); // Month is 0-indexed
+        const day = String(date.getUTCDate()).padStart(2, '0');
+        const hours = String(date.getUTCHours()).padStart(2, '0');
+        const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+        const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+
+        return `${year}${month}${day}${hours}${minutes}${seconds}`;
     }
 
     /**
