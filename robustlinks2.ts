@@ -2,18 +2,39 @@
  *
  * @overview A general purpose library for handling Robust Link data.
  * Provides tools necessary for creating, augmenting, and parsing Robust
- * Links. 
- * 
+ * Links.
+ *
  * Currently assumes another client will handle specific data fetching
- * methods for TimeGates and TimeMaps. 
- * 
+ * methods for TimeGates and TimeMaps.
+ *
  * @author Yorick Chollet <yorick.chollet@gmail.com>
  * @author Harihar Shankar <hariharshankar@gmail.com>
  * @author Shawn M. Jones <jones.shawn.m@gmail.com>
  * @author Dylan O'Connor <dylankconnor@gmail.com>
  * @version 3.0.0
  * License can be obtained at http://mementoweb.github.io/SiteStory/license.html
- * 
+ *
+ *
+ * Future Work:
+ *
+ * Moving out the exclusions from this file and including it with an extra json file
+ *
+ * Configurable fallback for versiondate, other parameters
+ *
+ * End goal of library:
+ * Instantiate class, add a config, and let it go to work
+ *
+ * Configuration for different css selectors, only links in certain sections.
+ *
+ * Reconstructive-esque page with documentation, github page, and examples
+ *
+ * Drop-down menu to choose links, customizable banner
+ *
+ * Robust Links can check to see how many robustified links are alive or dead
+ *
+ * Attach an event handler on a higher level element that will reinstantiate after
+ * a certain amount of time
+ *
 */
 
 /**
@@ -22,16 +43,37 @@
  */
 export interface RobustLinksConfig {
     id?: string;
-    urimPattern?: string;
     debug?: boolean;
+    defaultTimeGate?: string;
+    /**
+     * If true, the constructor will automatically call `makeAllLinksRobust`
+     * on relevant links. Can also be an object to configure `makeAllLinksRobust` specifically.
+     * If `autoInit.defaultDataProducer` is true, the system will use the `defaultTimeGate`
+     * to construct the new `href` and `data-originalurl` values.
+     */
+    autoInit?: boolean | {
+        selector?: string; // Optional: defaults to 'a:not([data-originalurl])' if defaultDataProducer is true
+        dataProducer?: (anchor: HTMLAnchorElement, index: number) => {
+            originalUrl: string;
+            versionDate: Date;
+            versionSnapshots?: RobustLinkSnapshot[];
+            newHref?: string;
+        } | null | undefined;
+        rootElement?: HTMLElement;
+        /**
+         * If true, the `dataProducer` will be automatically generated using the `defaultTimeGate`
+         * to create robust links for existing anchor tags. This will override any custom `dataProducer`.
+         */
+        defaultDataProducer?: boolean;
+    };
 }
 
 /**
  * Defines the accepted formats for data-versiondate and snapshot datetimes.
- * - YYYY-MM-DD (ISO8601 date)
- * - YYYY-MM-DDThh:mm:ssZ (ISO8601 datetime UTC)
- * - YYYYMMDD (Web Archive URI date)
- * - YYYYMMDDhhmmss (Web Archive URI datetime)
+ * -<ctrl42>-MM-DD (ISO8601 date)
+ * -<ctrl42>-MM-DDThh:mm:ssZ (ISO8601 datetime UTC)
+ * -<ctrl42>MMDD (Web Archive URI date)
+ * -<ctrl42>MMDDhhmmss (Web Archive URI datetime)
  */
 export type RobustLinkDatetimeString = string; // Validation handled by parseDatetime function
 
@@ -91,15 +133,10 @@ export class RobustLinksV2 {
     public id: string;
     public urimPattern: string;
     public debug: boolean;
+    public defaultTimeGate: string; // New public property for the default TimeGate
 
     // Private properties for internal use
-    private _regexps: {
-        urimPattern: RegExp;
-        absoluteReference: RegExp;
-        bodyEnd: RegExp;
-    };
     private exclusions: { [key: string]: (url: string) => boolean };
-
 
     /**
      * Creates a new RobustLinksV2 instance with optional configurations.
@@ -109,44 +146,17 @@ export class RobustLinksV2 {
      */
     constructor(config?: RobustLinksConfig) {
 
-        /**
-         * Identification for the Robust Links instance, name:version
-         * Not intended to be overwritten by a config object
-         *
-         * @type {string}
-         */
         this.id = `${this.NAME}:${this.VERSION}`;
 
-        /**
-         * A local constant computed to dynamically determine the base URL of
-         * the web application that RobustLinks is running on.
-         *
-         * This is an internally derived object and not meant to be overridden.
-         *
-         * @type {string}
-         */
         const origin = typeof self !== 'undefined' && self.location && self.location.origin ? self.location.origin : '';
 
-        /**
-         * Defines the Uniform Resource Identifier-M Pattern.
-         * This pattern is crucial for identifying and constructing
-         * memento URIs.
-         *
-         * Defaults to a webserver with a predefined memento pathway
-         *
-         * @type {string}
-         */
+        // Default URIM pattern. Can be overridden by config or implicitly by defaultTimeGate.
         this.urimPattern = `${origin}/memento/<datetime>/<urir>`;
 
-        /**
-         * A private object that holds a collection of functions
-         * each designed to test whether or not a link should be
-         * included or ignored by the RobustLinksV2 system
-         *
-         * @type { [key: string]: (url: string) => boolean }
-         */
+        // Default TimeGate, prioritizes Wayback Machine
+        this.defaultTimeGate = "https://web.archive.org/web/";
+
         this.exclusions = {
-            // Converts patterns like "https?://web.archive.org/web/*" into actual RegExp objects.
             isKnownArchive: (url: string) => {
                 const archivePatterns = [
                     "https?://web.archive.org/web/",
@@ -187,61 +197,69 @@ export class RobustLinksV2 {
 
                 return archivePatterns.some(pattern => {
                     let processedPattern = pattern;
-
-                    // 1. Escape literal dots. All dots in your provided patterns are literal,
-                    //    meaning they should match a period character, not "any character".
                     processedPattern = processedPattern.replace(/\./g, '\\.');
-
-                    // 2. The `https?` part already correctly uses `?` as a quantifier.
-                    //    No specific replacement needed for `?` if it's meant as a quantifier.
-                    //    DO NOT use `replace(/\?/g, '.')` as it changes its meaning.
-
-                    // 3. For parts like `[0-9]+` or `[0-9A-Z]{4}-[0-9A-Z]{4}`,
-                    //    the `[`, `]`, `{`, `}`, `+`, `-` inside these are intended to be regex metacharacters
-                    //    and should be passed as is to `new RegExp`.
-                    //    `processedPattern` should already have them.
-
-                    const regex = new RegExp(`^${processedPattern}`, 'i'); // Anchor to start, case-insensitive
-
+                    const regex = new RegExp(`^${processedPattern}`, 'i');
                     return regex.test(url);
                 });
             }
         };
 
-        /**
-         * Whether or not to show debug messages in the console.
-         * Defaults to false.
-         *
-         * @type {boolean}
-         */
         this.debug = false;
 
-        // Overwrite defaults with any provided configuration
+        // Apply config overrides
         if (config instanceof Object) {
             for (const [key, value] of Object.entries(config)) {
-                // Type assertion to allow dynamic assignment, assuming config keys match public properties
                 if (Object.prototype.hasOwnProperty.call(this, key)) {
                      (this as any)[key] = value;
                 }
             }
         }
 
-        // ----INTERNAL PROPERTIES-----
-        /**
-         * This section of the constructor initializes _regexps, a private object that
-         * stores regular expression patterns essential for RobustLinksV2's core functionality.
-         * These patterns are used internally to identify, parse, and manipulate URLs and HTML content.
-         * Not needed at the moment, but could be useful in the FUTURE
-         *
-         * @type {{ urimPattern: RegExp; absoluteReference: RegExp; bodyEnd: RegExp; }}
-         */
-        this._regexps = {
-            urimPattern: new RegExp(`^${this.urimPattern.replace('<datetime>', '(\\d{14})').replace('<urir>', '(.*)')}$`),
-            // This regex will match absolute HTTP/HTTPS URLs in src, href, or content attributes.
-            // It captures: (1) prefix, (2) tag/attribute info, (3) the URL, (4) suffix
-            absoluteReference: new RegExp(`(<(iframe|a|meta|link|script).*?\\s+(src|href|content|url)\\s*=\\s*["']?)(https?:\/\/[^'"\\s]+)(.*?>)`, 'ig'),
-            bodyEnd: new RegExp('<\/(body|html)>', 'i')
-        };
+        // If a defaultTimeGate is explicitly set in config, use it for urimPattern if urimPattern wasn't also explicitly set.
+        // The idea is that defaultTimeGate is more user-friendly for a common TimeGate base.
+        if (config?.defaultTimeGate) {
+            this.urimPattern = `${this.defaultTimeGate}<datetime>/<urir>`;
+        } else {
+             this.urimPattern = `${this.defaultTimeGate}<datetime>/<urir>`;
+        }
+
+        // --- Auto-initialization based on config ---
+        if (config?.autoInit) {
+            this.logDebug('RobustLinksV2: Auto-initialization enabled.');
+
+            // Determine the dataProducer and selector based on autoInit config
+            let autoInitSelector: string = 'a:not([data-originalurl])'; // Default: target non-robust links
+            let autoInitDataProducer: ((anchor: HTMLAnchorElement, index: number) => { originalUrl: string; versionDate: Date; versionSnapshots?: RobustLinkSnapshot[]; newHref?: string; } | null | undefined) | undefined;
+            let autoInitRootElement: HTMLElement | undefined = undefined;
+
+            if (typeof config.autoInit === 'boolean' && config.autoInit === true) {
+                // If just `autoInit: true`, use the default data producer
+                autoInitDataProducer = this._createDefaultDataProducer();
+                this.logDebug('RobustLinksV2: Auto-initializing with default selector and data producer.');
+            } else if (typeof config.autoInit === 'object') {
+                autoInitSelector = config.autoInit.selector || autoInitSelector;
+                autoInitRootElement = config.autoInit.rootElement;
+
+                if (config.autoInit.defaultDataProducer === true) {
+                    // If defaultDataProducer is explicitly true in object config, generate it
+                    autoInitDataProducer = this._createDefaultDataProducer();
+                    this.logDebug('RobustLinksV2: Auto-initializing with specified selector and default data producer.');
+                } else if (config.autoInit.dataProducer) {
+                    // Use the custom data producer provided in the config
+                    autoInitDataProducer = config.autoInit.dataProducer;
+                    this.logDebug('RobustLinksV2: Auto-initializing with specified selector and custom data producer.');
+                } else {
+                    console.warn("RobustLinksV2: 'autoInit' object provided without 'dataProducer' or 'defaultDataProducer: true'. Skipping automatic robust link creation.");
+                }
+            } else {
+                console.warn("RobustLinksV2: Invalid 'autoInit' configuration. Expected boolean or object. Skipping automatic robust link creation.");
+            }
+
+            // Execute makeAllLinksRobust if a dataProducer was determined
+            if (autoInitDataProducer) {
+                this.makeAllLinksRobust(autoInitSelector, autoInitDataProducer, autoInitRootElement);
+            }
+        }
     }
 
     // ---- EXTERNAL FUNCTIONS ----
@@ -253,26 +271,32 @@ export class RobustLinksV2 {
      * used to negotiate the best available memento.
      *
      * @param originalUrl The URI of the original resource (URI-R). Must be an absolute HTTP/HTTPS URL.
-     * @param dateTime The desired historical datetime for the memento.
-     * @returns A string representing the Memento URI.
+     * @param dateTime Optional. The desired historical datetime for the memento. If omitted,
+     * the URI will act as a TimeGate to the *latest* known Memento (e.g., `https://web.archive.org/web/originalUrl`).
+     * @returns A string representing the Memento URI (URI-M or URI-G).
      * @throws {Error} if the originalUrl is not a valid absolute HTTP/HTTPS URL.
      */
-    public createMementoUri(originalUrl: string, dateTime: Date): string {
+    public createMementoUri(originalUrl: string, dateTime?: Date): string {
         if (!RobustLinksV2.isValidAbsoluteUrl(originalUrl)) {
             this.logDebug(`RobustLinksV2: originalUrl "${originalUrl}" is not a valid absolute HTTP/HTTPS URL for Memento URI creation.`);
             throw new Error(`Invalid originalUrl: "${originalUrl}" is not an absolute HTTP/HTTPS URI.`);
         }
 
-        const datetimeString = this.formatDateTime(dateTime);
+        let mementoUri: string;
 
-        // Per RFC 7089 (Memento protocol), the URI-R in the URI-M is the original URI itself,
-        // without further encoding, as it's part of the path, but the server handles its parsing.
-        // So, direct replacement is usually fine.
-        const mementoUri = this.urimPattern
-            .replace('<datetime>', datetimeString)
-            .replace('<urir>', originalUrl);
-
-        this.logDebug(`RobustLinksV2: Created Memento URI: ${mementoUri} for originalUrl: ${originalUrl} at datetime: ${dateTime.toISOString()}`);
+        if (dateTime) {
+            // If a specific datetime is provided, construct a URI-M (or a TimeGate with specific time)
+            const datetimeString = this.formatDateTime(dateTime);
+            mementoUri = this.urimPattern
+                .replace('<datetime>', datetimeString)
+                .replace('<urir>', originalUrl);
+            this.logDebug(`RobustLinksV2: Created Memento URI-M: ${mementoUri} for originalUrl: ${originalUrl} at datetime: ${dateTime.toISOString()}`);
+        } else {
+            // If no datetime, construct a TimeGate URI (URI-G) to get the latest
+            // The Wayback Machine's TimeGate for "latest" is simply base + originalUrl
+            mementoUri = `${this.defaultTimeGate}${originalUrl}`;
+            this.logDebug(`RobustLinksV2: Created Memento TimeGate URI (latest): ${mementoUri} for originalUrl: ${originalUrl}`);
+        }
 
         return mementoUri;
     }
@@ -304,7 +328,7 @@ export class RobustLinksV2 {
      * @returns A Date object representing the parsed datetime, or null if invalid.
      */
     public static parseDatetime(datetimeStr: RobustLinkDatetimeString): Date | null {
-        // ISO8601 Date: YYYY-MM-DD
+        // ISO8601 Date:<ctrl42>-MM-DD
         const isoDateMatch = datetimeStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
         if (isoDateMatch) {
             // Interpret as noon UTC
@@ -316,7 +340,7 @@ export class RobustLinksV2 {
             ));
         }
 
-        // ISO8601 Datetime: YYYY-MM-DDThh:mm:ssZ
+        // ISO8601 Datetime:<ctrl42>-MM-DDThh:mm:ssZ
         const isoDatetimeMatch = datetimeStr.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z$/);
         if (isoDatetimeMatch) {
             return new Date(Date.UTC(
@@ -329,7 +353,7 @@ export class RobustLinksV2 {
             ));
         }
 
-        // Web Archive URI Date: YYYYMMDD
+        // Web Archive URI Date:<ctrl42>MMDD
         const waDateMatch = datetimeStr.match(/^(\d{4})(\d{2})(\d{2})$/);
         if (waDateMatch) {
             // Interpret as noon UTC
@@ -341,7 +365,7 @@ export class RobustLinksV2 {
             ));
         }
 
-        // Web Archive URI Datetime: YYYYMMDDhhmmss
+        // Web Archive URI Datetime:<ctrl42>MMDDhhmmss
         const waDatetimeMatch = datetimeStr.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/);
         if (waDatetimeMatch) {
             return new Date(Date.UTC(
@@ -476,6 +500,7 @@ export class RobustLinksV2 {
      * @returns An array of ParsedRobustLink objects found.
      */
     public findAndParseRobustLinks(rootElement?: HTMLElement): ParsedRobustLink[] {
+        this.logDebug('RobustLinksV2: Searching for and parsing existing robust links.');
         const links: ParsedRobustLink[] = [];
         const scope = rootElement || document.body;
         const anchorElements = scope.querySelectorAll('a[data-originalurl][data-versiondate]'); // Select only potential robust links
@@ -502,7 +527,7 @@ export class RobustLinksV2 {
                 // Continue to the next link
             }
         });
-
+        this.logDebug(`RobustLinksV2: Found and parsed ${links.length} robust links.`);
         return links;
     }
 
@@ -513,8 +538,8 @@ export class RobustLinksV2 {
      * @returns A string representing the HTML <a> tag.
      */
     public createRobustLinkHtml(parsedLink: ParsedRobustLink): string {
-        // Format versionDate to YYYY-MM-DD for data-versiondate attribute
-        // Note: Date.toISOString() gives YYYY-MM-DDTHH:mm:ss.sssZ, we only want the date part.
+        // Format versionDate to<ctrl42>-MM-DD for data-versiondate attribute
+        // Note: Date.toISOString() gives<ctrl42>-MM-DDTHH:mm:ss.sssZ, we only want the date part.
         const versionDateStr = parsedLink.versionDate.toISOString().split('T')[0];
 
         let versionUrlAttr = '';
@@ -578,7 +603,7 @@ export class RobustLinksV2 {
 
         anchorElement.setAttribute('data-originalurl', options.originalUrl);
 
-        // Format versionDate to YYYY-MM-DD for data-versiondate attribute
+        // Format versionDate to<ctrl42>-MM-DD for data-versiondate attribute
         const versionDateStr = options.versionDate.toISOString().split('T')[0];
         anchorElement.setAttribute('data-versiondate', versionDateStr);
 
@@ -648,7 +673,49 @@ export class RobustLinksV2 {
     // ------ INTERNAL FUNCTIONS --------
 
     /**
-     * Formats a Date object into the 14-digit YYYYMMDDhhmmss UTC string required for Memento URIs.
+     * Creates a default dataProducer function that uses the configured `defaultTimeGate`
+     * to generate robust link data.
+     * This function is designed to be used when `autoInit` or `defaultDataProducer` is true.
+     * It will:
+     * - Use the `href` of the anchor as the `originalUrl`.
+     * - Set `versionDate` to the current date and time (as a plausible default, but ideally
+     * this would come from server-side data like last-modified or publication date).
+     * - Set `newHref` to the TimeGate URI for the original URL (e.g., `https://web.archive.org/web/originalUrl`).
+     *
+     * @returns A `dataProducer` function.
+     */
+    private _createDefaultDataProducer(): (anchor: HTMLAnchorElement, index: number) => { originalUrl: string; versionDate: Date; newHref?: string; } | null | undefined {
+        return (anchor: HTMLAnchorElement) => {
+            const originalUrl = anchor.href;
+
+            // Only attempt to robustify if the original URL is valid and not already an archive URL
+            if (!RobustLinksV2.isValidAbsoluteUrl(originalUrl) || this.isArchiveUrl(originalUrl)) {
+                this.logDebug(`RobustLinksV2: Skipping "${originalUrl}" for default robustification (invalid or already archive).`);
+                return null;
+            }
+
+            // For a default, we'll use the current date as the versionDate.
+            // In a more advanced scenario, you'd fetch the document's publication date
+            // or last-modified date.
+            const versionDate = new Date(); // Current date/time
+
+            // The new href will be the TimeGate URL, which defaults to the latest memento.
+            // Note: We don't provide a specific datetime to `createMementoUri` here,
+            // so it generates the URI-G (TimeGate for latest).
+            const newHref = this.createMementoUri(originalUrl);
+
+            this.logDebug(`RobustLinksV2: Default data producer for "${originalUrl}" generated new href: "${newHref}"`);
+
+            return {
+                originalUrl: originalUrl,
+                versionDate: versionDate,
+                newHref: newHref
+            };
+        };
+    }
+
+    /**
+     * Formats a Date object into the 14-digit<ctrl42>MMDDhhmmss UTC string required for Memento URIs.
      * This is a helper for createMementoUri.
      * @param date The Date object to format.
      * @returns A 14-digit datetime string (e.g., "20231026143000").
@@ -674,6 +741,4 @@ export class RobustLinksV2 {
             console.log(`[${this.NAME} DEBUG] ${message}`, ...optionalParams);
         }
     }
-
-
 }
