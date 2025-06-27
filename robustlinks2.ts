@@ -70,10 +70,10 @@ export interface RobustLinksConfig {
 
 /**
  * Defines the accepted formats for data-versiondate and snapshot datetimes.
- * -<ctrl42>-MM-DD (ISO8601 date)
- * -<ctrl42>-MM-DDThh:mm:ssZ (ISO8601 datetime UTC)
- * -<ctrl42>MMDD (Web Archive URI date)
- * -<ctrl42>MMDDhhmmss (Web Archive URI datetime)
+ * YYYY-MM-DD (ISO8601 date)
+ * YYYY-MM-DDThh:mm:ssZ (ISO8601 datetime UTC)
+ * YYYYMMDD (Web Archive URI date)
+ * YYYYMMDDhhmmss (Web Archive URI datetime)
  */
 export type RobustLinkDatetimeString = string; // Validation handled by parseDatetime function
 
@@ -148,13 +148,12 @@ export class RobustLinksV2 {
 
         this.id = `${this.NAME}:${this.VERSION}`;
 
-        const origin = typeof self !== 'undefined' && self.location && self.location.origin ? self.location.origin : '';
+        // Step 1: Initialize defaultTimeGate to its clean, intended value for Wayback Machine.
+        this.defaultTimeGate = "https://web.archive.org/";
 
-        // Default URIM pattern. Can be overridden by config or implicitly by defaultTimeGate.
-        this.urimPattern = `${origin}/memento/<datetime>/<urir>`;
+        // Step 2: Initialize urimPattern based on this defaultTimeGate for specific datetime lookups.
+        this.urimPattern = `${this.defaultTimeGate}<datetime>/<urir>`;
 
-        // Default TimeGate, prioritizes Wayback Machine
-        this.defaultTimeGate = "https://web.archive.org/web/";
 
         this.exclusions = {
             isKnownArchive: (url: string) => {
@@ -206,21 +205,20 @@ export class RobustLinksV2 {
 
         this.debug = false;
 
-        // Apply config overrides
+        // Step 3: Apply config overrides.
+        // Special handling for 'defaultTimeGate' to ensure it's normalized to the Wayback Machine base.
         if (config instanceof Object) {
             for (const [key, value] of Object.entries(config)) {
-                if (Object.prototype.hasOwnProperty.call(this, key)) {
+                if (key === 'defaultTimeGate' && typeof value === 'string') {
+                    // Force it to the exact desired base for Wayback Machine
+                    this.defaultTimeGate = "https://web.archive.org/";
+                    // Re-derive urimPattern as defaultTimeGate was explicitly set
+                    this.urimPattern = `${this.defaultTimeGate}<datetime>/<urir>`;
+                } else if (Object.prototype.hasOwnProperty.call(this, key)) {
+                     // For other config properties, assign directly
                      (this as any)[key] = value;
                 }
             }
-        }
-
-        // If a defaultTimeGate is explicitly set in config, use it for urimPattern if urimPattern wasn't also explicitly set.
-        // The idea is that defaultTimeGate is more user-friendly for a common TimeGate base.
-        if (config?.defaultTimeGate) {
-            this.urimPattern = `${this.defaultTimeGate}<datetime>/<urir>`;
-        } else {
-             this.urimPattern = `${this.defaultTimeGate}<datetime>/<urir>`;
         }
 
         // --- Auto-initialization based on config ---
@@ -272,7 +270,7 @@ export class RobustLinksV2 {
      *
      * @param originalUrl The URI of the original resource (URI-R). Must be an absolute HTTP/HTTPS URL.
      * @param dateTime Optional. The desired historical datetime for the memento. If omitted,
-     * the URI will act as a TimeGate to the *latest* known Memento (e.g., `https://web.archive.org/web/originalUrl`).
+     * the URI will act as a TimeGate to the *latest* known Memento (e.g., `https://web.archive.org/originalUrl`).
      * @returns A string representing the Memento URI (URI-M or URI-G).
      * @throws {Error} if the originalUrl is not a valid absolute HTTP/HTTPS URL.
      */
@@ -286,6 +284,7 @@ export class RobustLinksV2 {
 
         if (dateTime) {
             // If a specific datetime is provided, construct a URI-M (or a TimeGate with specific time)
+            // Note: formatDateTime is an assumed utility function for converting Date to YYYYMMDDhhmmss
             const datetimeString = this.formatDateTime(dateTime);
             mementoUri = this.urimPattern
                 .replace('<datetime>', datetimeString)
@@ -293,7 +292,8 @@ export class RobustLinksV2 {
             this.logDebug(`RobustLinksV2: Created Memento URI-M: ${mementoUri} for originalUrl: ${originalUrl} at datetime: ${dateTime.toISOString()}`);
         } else {
             // If no datetime, construct a TimeGate URI (URI-G) to get the latest
-            // The Wayback Machine's TimeGate for "latest" is simply base + originalUrl
+            // This will use the normalized defaultTimeGate (e.g., https://web.archive.org/)
+            // resulting in the correct format: https://web.archive.org/originalUrl
             mementoUri = `${this.defaultTimeGate}${originalUrl}`;
             this.logDebug(`RobustLinksV2: Created Memento TimeGate URI (latest): ${mementoUri} for originalUrl: ${originalUrl}`);
         }
@@ -328,7 +328,7 @@ export class RobustLinksV2 {
      * @returns A Date object representing the parsed datetime, or null if invalid.
      */
     public static parseDatetime(datetimeStr: RobustLinkDatetimeString): Date | null {
-        // ISO8601 Date:<ctrl42>-MM-DD
+        // ISO8601 Date: YYYY-MM-DD
         const isoDateMatch = datetimeStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
         if (isoDateMatch) {
             // Interpret as noon UTC
@@ -340,7 +340,7 @@ export class RobustLinksV2 {
             ));
         }
 
-        // ISO8601 Datetime:<ctrl42>-MM-DDThh:mm:ssZ
+        // ISO8601 Datetime: YYYY-MM-DDThh:mm:ssZ
         const isoDatetimeMatch = datetimeStr.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z$/);
         if (isoDatetimeMatch) {
             return new Date(Date.UTC(
@@ -353,7 +353,7 @@ export class RobustLinksV2 {
             ));
         }
 
-        // Web Archive URI Date:<ctrl42>MMDD
+        // Web Archive URI Date: YYYYMMDD
         const waDateMatch = datetimeStr.match(/^(\d{4})(\d{2})(\d{2})$/);
         if (waDateMatch) {
             // Interpret as noon UTC
@@ -365,7 +365,7 @@ export class RobustLinksV2 {
             ));
         }
 
-        // Web Archive URI Datetime:<ctrl42>MMDDhhmmss
+        // Web Archive URI Datetime: YYYYMMDDhhmmss
         const waDatetimeMatch = datetimeStr.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/);
         if (waDatetimeMatch) {
             return new Date(Date.UTC(
@@ -538,8 +538,8 @@ export class RobustLinksV2 {
      * @returns A string representing the HTML <a> tag.
      */
     public createRobustLinkHtml(parsedLink: ParsedRobustLink): string {
-        // Format versionDate to<ctrl42>-MM-DD for data-versiondate attribute
-        // Note: Date.toISOString() gives<ctrl42>-MM-DDTHH:mm:ss.sssZ, we only want the date part.
+        // Format versionDate to YYYY-MM-DD for data-versiondate attribute
+        // Note: Date.toISOString() gives YYYY-MM-DDTHH:mm:ss.sssZ, we only want the date part.
         const versionDateStr = parsedLink.versionDate.toISOString().split('T')[0];
 
         let versionUrlAttr = '';
@@ -603,7 +603,7 @@ export class RobustLinksV2 {
 
         anchorElement.setAttribute('data-originalurl', options.originalUrl);
 
-        // Format versionDate to<ctrl42>-MM-DD for data-versiondate attribute
+        // Format versionDate to YYYY-MM-DD for data-versiondate attribute
         const versionDateStr = options.versionDate.toISOString().split('T')[0];
         anchorElement.setAttribute('data-versiondate', versionDateStr);
 
@@ -635,7 +635,7 @@ export class RobustLinksV2 {
      * and optional versionSnapshots and newHref for that link.
      * If the function returns null or undefined, the link is skipped.
      * @param rootElement The HTML element to search within. Defaults to `document.body`.
-     * @returns An array of HTMLAnchorElements that were successfully made robust.
+     * @returns An array of HTMLAnchorElementS that were successfully made robust.
      */
     public makeAllLinksRobust(
         selector: string,
@@ -672,39 +672,58 @@ export class RobustLinksV2 {
 
     // ------ INTERNAL FUNCTIONS --------
 
+    // Private utility function for logging debug messages
+    private logDebug(message: string, ...args: any[]): void {
+        if (this.debug) {
+            console.debug(message, ...args);
+        }
+    }
+
+    // Private utility function to format Date objects into a specific string format (e.g., YYYYMMDDhhmmss)
+    // This is a placeholder and should be implemented according to your specific needs for URIM datetime.
+    // For Wayback Machine YYYYMMDDhhmmss, it would look like:
+    private formatDateTime(date: Date): string {
+        const year = date.getUTCFullYear().toString();
+        const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+        const day = date.getUTCDate().toString().padStart(2, '0');
+        const hours = date.getUTCHours().toString().padStart(2, '0');
+        const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+        const seconds = date.getUTCSeconds().toString().padStart(2, '0');
+        return `${year}${month}${day}${hours}${minutes}${seconds}`;
+    }
+
     /**
      * Creates a default dataProducer function that uses the configured `defaultTimeGate`
      * to generate robust link data.
      * This function is designed to be used when `autoInit` or `defaultDataProducer` is true.
      * It will:
      * - Use the `href` of the anchor as the `originalUrl`.
-     * - Set `versionDate` to the current date and time (as a plausible default, but ideally
-     * this would come from server-side data like last-modified or publication date).
-     * - Set `newHref` to the TimeGate URI for the original URL (e.g., `https://web.archive.org/web/originalUrl`).
-     *
-     * @returns A `dataProducer` function.
+     * - Set `versionDate` to the current date and time (as a plausible default).
+     * - Set `newHref` to the TimeGate URI for the latest memento.
      */
-    private _createDefaultDataProducer(): (anchor: HTMLAnchorElement, index: number) => { originalUrl: string; versionDate: Date; newHref?: string; } | null | undefined {
-        return (anchor: HTMLAnchorElement) => {
-            const originalUrl = anchor.href;
+    private _createDefaultDataProducer(): (anchor: HTMLAnchorElement, index: number) => {
+        originalUrl: string;
+        versionDate: Date;
+        versionSnapshots?: RobustLinkSnapshot[];
+        newHref?: string;
+    } | null | undefined {
+        return (anchor: HTMLAnchorElement, index: number) => {
+            const originalUrl = anchor.href; // The current href of the link is considered the original URL
 
-            // Only attempt to robustify if the original URL is valid and not already an archive URL
-            if (!RobustLinksV2.isValidAbsoluteUrl(originalUrl) || this.isArchiveUrl(originalUrl)) {
-                this.logDebug(`RobustLinksV2: Skipping "${originalUrl}" for default robustification (invalid or already archive).`);
+            // Basic validation: ensure it's a valid absolute URL before processing
+            if (!RobustLinksV2.isValidAbsoluteUrl(originalUrl)) {
+                this.logDebug(`RobustLinksV2: Skipping link "${originalUrl}" because it's not a valid absolute HTTP/HTTPS URL for default robustification.`);
                 return null;
             }
 
-            // For a default, we'll use the current date as the versionDate.
-            // In a more advanced scenario, you'd fetch the document's publication date
-            // or last-modified date.
-            const versionDate = new Date(); // Current date/time
+            // The versionDate is the intended linking datetime. For default autoInit,
+            // using the current time is a reasonable fallback if not explicitly provided elsewhere.
+            const versionDate = new Date(); // Current date and time
 
-            // The new href will be the TimeGate URL, which defaults to the latest memento.
-            // Note: We don't provide a specific datetime to `createMementoUri` here,
-            // so it generates the URI-G (TimeGate for latest).
+            // Generate the new href using createMementoUri.
+            // By passing only originalUrl (and no dateTime), it will produce the TimeGate
+            // for the latest memento: https://web.archive.org/originalUrl
             const newHref = this.createMementoUri(originalUrl);
-
-            this.logDebug(`RobustLinksV2: Default data producer for "${originalUrl}" generated new href: "${newHref}"`);
 
             return {
                 originalUrl: originalUrl,
@@ -712,33 +731,5 @@ export class RobustLinksV2 {
                 newHref: newHref
             };
         };
-    }
-
-    /**
-     * Formats a Date object into the 14-digit<ctrl42>MMDDhhmmss UTC string required for Memento URIs.
-     * This is a helper for createMementoUri.
-     * @param date The Date object to format.
-     * @returns A 14-digit datetime string (e.g., "20231026143000").
-     */
-    private formatDateTime(date: Date): string {
-        const year = date.getUTCFullYear();
-        const month = String(date.getUTCMonth() + 1).padStart(2, '0'); // Month is 0-indexed
-        const day = String(date.getUTCDate()).padStart(2, '0');
-        const hours = String(date.getUTCHours()).padStart(2, '0');
-        const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-        const seconds = String(date.getUTCSeconds()).padStart(2, '0');
-
-        return `${year}${month}${day}${hours}${minutes}${seconds}`;
-    }
-
-    /**
-     * Logs a debug message to the console if `this.debug` is true.
-     * @param message The message to log.
-     * @param optionalParams Optional additional parameters to log.
-     */
-    private logDebug(message: string, ...optionalParams: any[]): void {
-        if (this.debug) {
-            console.log(`[${this.NAME} DEBUG] ${message}`, ...optionalParams);
-        }
     }
 }
