@@ -14,8 +14,6 @@
  * @version 3.0.0
  * License can be obtained at http://mementoweb.github.io/SiteStory/license.html
  *
- * 
- * WEB ARCHIVE GLITCH-> currently fails when link timegate is configurable.
  *
  * Future Work:
  *
@@ -46,15 +44,9 @@
 export interface RobustLinksConfig {
     id?: string;
     debug?: boolean;
-    defaultTimeGate?: string;
-    /**
-     * If true, the constructor will automatically call `makeAllLinksRobust`
-     * on relevant links. Can also be an object to configure `makeAllLinksRobust` specifically.
-     * If `autoInit.defaultDataProducer` is true, the system will use the `defaultTimeGate`
-     * to construct the new `href` and `data-originalurl` values.
-     */
+    timeGate?: string;
     autoInit?: boolean | {
-        selector?: string; // Optional: defaults to 'a:not([data-originalurl])' if defaultDataProducer is true
+        selector?: string; 
         dataProducer?: (anchor: HTMLAnchorElement, index: number) => {
             originalUrl: string;
             versionDate: Date;
@@ -62,10 +54,6 @@ export interface RobustLinksConfig {
             newHref?: string;
         } | null | undefined;
         rootElement?: HTMLElement;
-        /**
-         * If true, the `dataProducer` will be automatically generated using the `defaultTimeGate`
-         * to create robust links for existing anchor tags. This will override any custom `dataProducer`.
-         */
         defaultDataProducer?: boolean;
     };
 }
@@ -135,7 +123,7 @@ export class RobustLinksV2 {
     public id: string;
     public urimPattern: string;
     public debug: boolean;
-    public defaultTimeGate: string; // New public property for the default TimeGate
+    public timeGate: string; // New public property for the default TimeGate
 
     // Private properties for internal use
     private exclusions: { [key: string]: (url: string) => boolean };
@@ -147,6 +135,13 @@ export class RobustLinksV2 {
      * @param {RobustLinksConfig} [config] - Optional configuration options to override defaults.
      */
     constructor(config?: RobustLinksConfig) {
+        /**
+         * Ensures config is initialized
+         * 
+         * @type {RobustLinksConfig}
+         * 
+         */
+        config = config || {};
 
         /**
          * Initializes the ID of the RobustLinksV2 instance.
@@ -154,20 +149,17 @@ export class RobustLinksV2 {
          */
         this.id = `${this.NAME}:${this.VERSION}`;
 
-        // Step 1: Initialize defaultTimeGate to its clean, intended value for Wayback Machine.
         /**
          * Initializes the default TimeGate URL for archive lookups.
          * @type {string}
          */
-        this.defaultTimeGate = "https://web.archive.org/";
+        this.timeGate = config.timeGate || "https://web.archive.org/";
 
-        // Step 2: Initialize urimPattern based on this defaultTimeGate for specific datetime lookups.
         /**
          * Initializes the URI-M pattern used for constructing Memento URIs with a specific datetime.
          * @type {string}
          */
-        this.urimPattern = `${this.defaultTimeGate}<datetime>/<urir>`;
-
+        this.urimPattern = `${this.timeGate}<datetime>/<urir>`;
 
         /**
          * Initializes a collection of URL exclusion patterns, primarily for identifying known archive URLs.
@@ -226,29 +218,6 @@ export class RobustLinksV2 {
          * @type {boolean}
          */
         this.debug = false;
-
-        // Step 3: Apply config overrides.
-        // Special handling for 'defaultTimeGate' to ensure it's normalized to the Wayback Machine base.
-        if (config instanceof Object) {
-            for (const [key, value] of Object.entries(config)) {
-                if (key === 'defaultTimeGate' && typeof value === 'string') {
-                    /**
-                     * Forces the defaultTimeGate to the exact desired base for Wayback Machine
-                     * when overridden in configuration, ensuring correct URI format.
-                     * @type {string}
-                     */
-                    this.defaultTimeGate = "https://web.archive.org/";
-                    /**
-                     * Re-derives the urimPattern based on the explicitly set defaultTimeGate.
-                     * @type {string}
-                     */
-                    this.urimPattern = `${this.defaultTimeGate}<datetime>/<urir>`;
-                } else if (Object.prototype.hasOwnProperty.call(this, key)) {
-                     // For other config properties, assign directly
-                     (this as any)[key] = value;
-                }
-            }
-        }
 
         // --- Auto-initialization based on config ---
         if (config?.autoInit) {
@@ -323,7 +292,7 @@ export class RobustLinksV2 {
             // If no datetime, construct a TimeGate URI (URI-G) to get the latest
             // This will use the normalized defaultTimeGate (e.g., https://web.archive.org/)
             // resulting in the correct format: https://web.archive.org/originalUrl
-            mementoUri = `${this.defaultTimeGate}${originalUrl}`;
+            mementoUri = `${this.timeGate}${originalUrl}`;
             this.logDebug(`RobustLinksV2: Created Memento TimeGate URI (latest): ${mementoUri} for originalUrl: ${originalUrl}`);
         }
 
