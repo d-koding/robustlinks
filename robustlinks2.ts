@@ -36,6 +36,10 @@
  *
  * Attach an event handler on a higher level element that will reinstantiate after
  * a certain amount of time
+ * 
+ * Current issue with dataproducer: How complex should it be to use something other than
+ * the archve? Right now it takes a lot of coding but it could be nice to just enter an
+ * archive name and be done.
  *
 */
 
@@ -56,7 +60,6 @@ export interface RobustLinksConfig {
             newHref?: string;
         } | null | undefined;
         rootElement?: HTMLElement;
-        defaultDataProducer?: boolean;
     
     }
     enableDropdown?: boolean;
@@ -277,24 +280,26 @@ export class RobustLinksV2 {
                 autoInitSelector = autoInitConfig.selector || autoInitSelector;
                 autoInitRootElement = autoInitConfig.rootElement;
 
-                if (autoInitConfig.defaultDataProducer === true) {
-                    // If defaultDataProducer is explicitly true in object config, generate it
-                    autoInitDataProducer = this._createDefaultDataProducer();
-                    this.logDebug('RobustLinksV2: Auto-initializing with specified selector and default data producer.');
-                } else if (autoInitConfig.dataProducer) {
-                    // Use the custom data producer provided in the config
+                // Check if a specific dataProducer function is provided
+                if (typeof autoInitConfig.dataProducer === 'function') {
                     autoInitDataProducer = autoInitConfig.dataProducer;
                     this.logDebug('RobustLinksV2: Auto-initializing with specified selector and custom data producer.');
-                } else {
-                    console.warn("RobustLinksV2: 'autoInit' object provided without 'dataProducer' or 'defaultDataProducer: true'. Skipping automatic robust link creation.");
                 }
-            } else {
-                console.warn("RobustLinksV2: Invalid 'autoInit' configuration. Expected boolean or object. Skipping automatic robust link creation.");
-            }
+                // If dataProducer is undefined (not provided in the config object)
+                else if (autoInitConfig.dataProducer === undefined) {
+                    autoInitDataProducer = this._createDefaultDataProducer();
+                    this.logDebug('RobustLinksV2: Auto-initializing with specified selector and default data producer.');
+                }
+                // If dataProducer was provided but it's not a function (e.g., null, true, false, a string, etc.)
+                else {
+                    console.warn("RobustLinksV2: 'autoInit' object provided with an invalid 'dataProducer' (expected a function or undefined). Skipping automatic robust link creation.");
+                    autoInitDataProducer = undefined;
+                }
 
-            // Execute makeAllLinksRobust if a dataProducer was determined
-            if (autoInitDataProducer) {
-                this.makeAllLinksRobust(autoInitSelector, autoInitDataProducer, autoInitRootElement);
+                // Execute makeAllLinksRobust if a dataProducer was determined
+                if (autoInitDataProducer) {
+                    this.makeAllLinksRobust(autoInitSelector, autoInitDataProducer, autoInitRootElement);
+                }
             }
         }
     }
