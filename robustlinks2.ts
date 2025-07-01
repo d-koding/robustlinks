@@ -16,6 +16,8 @@
  *
  *
  * Future Work:
+ * 
+ * Serverside fetching for more accurate version dates
  *
  * Moving out the exclusions from this file and including it with an extra json file
  *
@@ -224,7 +226,7 @@ export class RobustLinksV2 {
          * Initializes the debug mode setting. If true, debug messages will be logged to the console.
          * @type {boolean}
          */
-        this.debug = false;
+        this.debug = config.debug || false;
 
         /**
          * Initializes dropdown arrow as visible or invisible.
@@ -267,21 +269,21 @@ export class RobustLinksV2 {
             let autoInitDataProducer: ((anchor: HTMLAnchorElement, index: number) => { originalUrl: string; versionDate: Date; versionSnapshots?: RobustLinkSnapshot[]; newHref?: string; } | null | undefined) | undefined;
             let autoInitRootElement: HTMLElement | undefined = undefined;
 
-            if (typeof config.autoInit === 'boolean' && config.autoInit === true) {
+            if (typeof autoInitConfig === 'boolean' && autoInitConfig === true) {
                 // If just `autoInit: true`, use the default data producer
                 autoInitDataProducer = this._createDefaultDataProducer();
                 this.logDebug('RobustLinksV2: Auto-initializing with default selector and data producer.');
-            } else if (typeof config.autoInit === 'object') {
-                autoInitSelector = config.autoInit.selector || autoInitSelector;
-                autoInitRootElement = config.autoInit.rootElement;
+            } else if (typeof autoInitConfig === 'object') {
+                autoInitSelector = autoInitConfig.selector || autoInitSelector;
+                autoInitRootElement = autoInitConfig.rootElement;
 
-                if (config.autoInit.defaultDataProducer === true) {
+                if (autoInitConfig.defaultDataProducer === true) {
                     // If defaultDataProducer is explicitly true in object config, generate it
                     autoInitDataProducer = this._createDefaultDataProducer();
                     this.logDebug('RobustLinksV2: Auto-initializing with specified selector and default data producer.');
-                } else if (config.autoInit.dataProducer) {
+                } else if (autoInitConfig.dataProducer) {
                     // Use the custom data producer provided in the config
-                    autoInitDataProducer = config.autoInit.dataProducer;
+                    autoInitDataProducer = autoInitConfig.dataProducer;
                     this.logDebug('RobustLinksV2: Auto-initializing with specified selector and custom data producer.');
                 } else {
                     console.warn("RobustLinksV2: 'autoInit' object provided without 'dataProducer' or 'defaultDataProducer: true'. Skipping automatic robust link creation.");
