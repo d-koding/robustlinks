@@ -55,7 +55,11 @@ export interface RobustLinksConfig {
         } | null | undefined;
         rootElement?: HTMLElement;
         defaultDataProducer?: boolean;
-    };
+    
+    }
+    enableDropdown?: boolean;
+    dropdownArrowColor?: string;
+    dropdownArrowSize?: string;
 }
 
 /**
@@ -123,7 +127,10 @@ export class RobustLinksV2 {
     public id: string;
     public urimPattern: string;
     public debug: boolean;
-    public timeGate: string; // New public property for the default TimeGate
+    public timeGate: string;
+    public enableDropdown: boolean;
+    public dropdownArrowColor: string;
+    public dropdownArrowSize: string;
 
     // Private properties for internal use
     private exclusions: { [key: string]: (url: string) => boolean };
@@ -219,8 +226,40 @@ export class RobustLinksV2 {
          */
         this.debug = false;
 
+        /**
+         * Initializes dropdown arrow as visible or invisible.
+         * 
+         * @type {boolean}
+         * 
+         */
+        this.enableDropdown = config.enableDropdown === true;
+
+        /**
+         * Initializes color of dropdown arrow, regardless of visibility
+         * Defaults to blue
+         * 
+         * @type {string}
+         */
+        this.dropdownArrowColor = config.dropdownArrowColor || "#333";
+
+        /**
+         * Initializes the size of the dropdown arrow, regardless of visibility.
+         * Defaults to 6px
+         * 
+         * @type {string}
+         */
+        this.dropdownArrowSize = config.dropdownArrowSize || '6px';
+
+        /**
+         * Determines if robust links object will auto run on all present links
+         * Defaults to True
+         * 
+         * @type {boolean | object}
+         */
+        const autoInitConfig = config.autoInit !== undefined ? config.autoInit : true;
+
         // --- Auto-initialization based on config ---
-        if (config?.autoInit) {
+        if (autoInitConfig) {
             this.logDebug('RobustLinksV2: Auto-initialization enabled.');
 
             // Determine the dataProducer and selector based on autoInit config
@@ -599,6 +638,11 @@ export class RobustLinksV2 {
             throw new Error("Invalid versionDate provided. Must be a valid Date object.");
         }
 
+        if (this.enableDropdown && !anchorElement.dataset.hasRobustDropdown) {
+            this._attachDropdownToLink(anchorElement, options.originalUrl);
+            anchorElement.dataset.hasRobustDropdown = 'true';
+        }
+
         anchorElement.setAttribute('data-originalurl', options.originalUrl);
 
         // Format versionDate to YYYY-MM-DD for data-versiondate attribute
@@ -621,6 +665,83 @@ export class RobustLinksV2 {
         }
 
         this.logDebug(`RobustLinksV2: Updated <a> tag with href "${anchorElement.href}" to robust link.`);
+    }
+
+    /**
+     * Attaches a dropdown arrow and menu to a robust link.
+     * @param anchorElement The robust link (HTMLAnchorElement).
+     * @param originalUrl The original URL of the link, used for the archived link option.
+     */
+    private _attachDropdownToLink(anchorElement: HTMLAnchorElement, originalUrl: string): void {
+        const wrapper = document.createElement('span');
+        wrapper.className = 'robust-link-wrapper';
+        anchorElement.parentNode?.insertBefore(wrapper, anchorElement);
+        wrapper.appendChild(anchorElement);
+
+        const dropdownArrow = document.createElement('span');
+        dropdownArrow.className = 'robust-dropdown-arrow';
+        dropdownArrow.textContent = '▼'; // Unicode down arrow
+        dropdownArrow.style.color = this.dropdownArrowColor;
+        dropdownArrow.style.fontSize = this.dropdownArrowSize;
+        dropdownArrow.style.marginLeft = '4px';
+        dropdownArrow.style.cursor = 'pointer';
+        dropdownArrow.style.display = 'inline-block'; // Ensure it aligns nicely
+        dropdownArrow.style.verticalAlign = 'middle'; // Adjust vertical alignment
+
+        const dropdownMenu = document.createElement('div');
+        dropdownMenu.className = 'robust-dropdown-menu';
+        dropdownMenu.style.display = 'none'; // Hidden by default
+        dropdownMenu.style.position = 'absolute';
+        dropdownMenu.style.backgroundColor = '#f9f9f9';
+        dropdownMenu.style.minWidth = '160px';
+        dropdownMenu.style.boxShadow = '0px 8px 16px 0px rgba(0,0,0,0.2)';
+        dropdownMenu.style.zIndex = '1000'; // Ensure it's on top
+        dropdownMenu.style.padding = '8px 0';
+        dropdownMenu.style.borderRadius = '4px';
+
+        const archivedLinkOption = document.createElement('a');
+        archivedLinkOption.href = this.createMementoUri(originalUrl); // Generate the Memento URI
+        archivedLinkOption.textContent = 'Archived Version';
+        archivedLinkOption.target = '_blank'; // Open in new tab
+        archivedLinkOption.className = 'robust-dropdown-option';
+        archivedLinkOption.style.padding = '8px 16px';
+        archivedLinkOption.style.textDecoration = 'none';
+        archivedLinkOption.style.display = 'block';
+        archivedLinkOption.style.color = '#333';
+        archivedLinkOption.onmouseover = (e) => (e.currentTarget as HTMLElement).style.backgroundColor = '#f1f1f1';
+        archivedLinkOption.onmouseout = (e) => (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+
+        const currentLinkOption = document.createElement('a');
+        currentLinkOption.href = anchorElement.href; // The current href of the robust link
+        currentLinkOption.textContent = 'Current Destination';
+        currentLinkOption.target = '_blank'; // Open in new tab
+        currentLinkOption.className = 'robust-dropdown-option';
+        currentLinkOption.style.padding = '8px 16px';
+        currentLinkOption.style.textDecoration = 'none';
+        currentLinkOption.style.display = 'block';
+        currentLinkOption.style.color = '#333';
+        currentLinkOption.onmouseover = (e) => (e.currentTarget as HTMLElement).style.backgroundColor = '#f1f1f1';
+        currentLinkOption.onmouseout = (e) => (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+
+
+        dropdownMenu.appendChild(archivedLinkOption);
+        dropdownMenu.appendChild(currentLinkOption);
+        wrapper.appendChild(dropdownArrow);
+        wrapper.appendChild(dropdownMenu);
+
+        // Toggle dropdown visibility
+        dropdownArrow.addEventListener('click', (event) => {
+            event.preventDefault(); // Prevent the link from being followed
+            event.stopPropagation(); // Stop event from bubbling up
+            dropdownMenu.style.display = dropdownMenu.style.display === 'none' ? 'block' : 'none';
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (event) => {
+            if (!wrapper.contains(event.target as Node)) {
+                dropdownMenu.style.display = 'none';
+            }
+        });
     }
 
     /**
