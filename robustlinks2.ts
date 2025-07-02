@@ -1,3 +1,4 @@
+
 /** robustlinks2.ts
  *
  * @overview A general purpose library for handling Robust Link data.
@@ -13,33 +14,6 @@
  * @author Dylan O'Connor <dylankconnor@gmail.com>
  * @version 3.0.0
  * License can be obtained at http://mementoweb.github.io/SiteStory/license.html
- *
- *
- * Future Work:
- * 
- * Serverside fetching for more accurate version dates
- *
- * Moving out the exclusions from this file and including it with an extra json file
- *
- * Configurable fallback for versiondate, other parameters
- *
- * End goal of library:
- * Instantiate class, add a config, and let it go to work
- *
- * Configuration for different css selectors, only links in certain sections.
- *
- * Reconstructive-esque page with documentation, github page, and examples
- *
- * Drop-down menu to choose links, customizable banner
- *
- * Robust Links can check to see how many robustified links are alive or dead
- *
- * Attach an event handler on a higher level element that will reinstantiate after
- * a certain amount of time
- * 
- * Current issue with dataproducer: How complex should it be to use something other than
- * the archve? Right now it takes a lot of coding but it could be nice to just enter an
- * archive name and be done.
  *
 */
 
@@ -65,6 +39,7 @@ export interface RobustLinksConfig {
     enableDropdown?: boolean;
     dropdownArrowColor?: string;
     dropdownArrowSize?: string;
+    dropdownArrowHtml?: string;
 }
 
 /**
@@ -136,9 +111,12 @@ export class RobustLinksV2 {
     public enableDropdown: boolean;
     public dropdownArrowColor: string;
     public dropdownArrowSize: string;
+    public dropdownArrowHtml: string;
 
     // Private properties for internal use
     private exclusions: { [key: string]: (url: string) => boolean };
+    private _archivePatternRegexes: RegExp[] | null = null; 
+    private _patternsLoadingPromise: Promise<void> | null = null;
 
     /**
      * Creates a new RobustLinksV2 instance with optional configurations.
@@ -177,53 +155,21 @@ export class RobustLinksV2 {
          * Initializes a collection of URL exclusion patterns, primarily for identifying known archive URLs.
          * @type {{ [key: string]: (url: string) => boolean }}
          */
+        this._patternsLoadingPromise = this._loadAndCompileArchivePatterns();
+
         this.exclusions = {
             isKnownArchive: (url: string) => {
-                const archivePatterns = [
-                    "https?://web.archive.org/web/",
-                    "https?://web.archive.bibalex.org/web/",
-                    "https?://www.webarchive.org.uk/wayback/en/archive/",
-                    "https?://langzeitarchivierung.bib-bvb.de/wayback/",
-                    "https?://webcitation.org/",
-                    "https?://webarchive.loc.gov/all/",
-                    "https?://wayback.archive-it.org/all/",
-                    "https?://wayback.archive-it.org/[0-9]+/",
-                    "https?://webarchive.parliament.uk/[0-9]+/",
-                    "https?://webarchive.parliament.uk/[0-9]+tf_/",
-                    "https?://webarchive.nationalarchives.gov.uk/[0-9]+/",
-                    "https?://webarchive.nationalarchives.gov.uk/[0-9]+tf_/",
-                    "https?://archive.li/",
-                    "https?://archive.vn/",
-                    "https?://archive.fo/",
-                    "https?://archive.md/",
-                    "https?://archive.ph/",
-                    "https?://archive.today/",
-                    "https?://archive.is/",
-                    "https?://waext.banq.qc.ca/wayback/[0-9]+/",
-                    "https?://haw.nsk.hr/arhiva/",
-                    "https?://wayback.webarchiv.cz/wayback/[0-9]+/",
-                    "https?://wayback.vefsafn.is/wayback/[0-9]+/",
-                    "https?://arquivo.pt/wayback/[0-9]+/",
-                    "https?://arquivo.pt/wayback/[0-9]+if_/",
-                    "https?://perma-archives.org/warc/[0-9]+/",
-                    "https?://perma.cc/[0-9A-Z]{4}-[0-9A-Z]{4}/",
-                    "https?://wayback.padicat.cat/wayback/[0-9]+/",
-                    "https?://archive.aueb.gr/services/web/[0-9]+/",
-                    "https?://digital.library.yorku.ca/wayback/[0-9]+/",
-                    "https?://veebiarhiiv.digar.ee/a/[0-9]+/",
-                    "https?://webarchive.nrscotland.gov.uk/[0-9]+/",
-                    "https?://nukrobia.nuk.uni-lj.si:8080/wayback/[0-9]+/",
-                    "https?://swap.stanford.edu/[0-9]+/"
-                ];
-
-                return archivePatterns.some(pattern => {
-                    let processedPattern = pattern;
-                    processedPattern = processedPattern.replace(/\./g, '\\.');
-                    const regex = new RegExp(`^${processedPattern}`, 'i');
-                    return regex.test(url);
-                });
+                // This method must now handle the async nature of patterns.
+                // For simplicity here, it will only work *after* patterns are loaded.
+                // A more robust solution might queue checks or always return false until loaded.
+                if (this._archivePatternRegexes) {
+                    return this._archivePatternRegexes.some(regex => regex.test(url));
+                } else {
+                    this.logDebug('RobustLinksV2: isKnownArchive called before patterns were loaded.');
+                    return false; // Or throw an error, depending on desired behavior
+                }
             }
-        };
+        }
 
         /**
          * Initializes the debug mode setting. If true, debug messages will be logged to the console.
@@ -256,6 +202,14 @@ export class RobustLinksV2 {
         this.dropdownArrowSize = config.dropdownArrowSize || '6px';
 
         /**
+         * Initializes a custom dropdown arrow, based on string html
+         * defaults to a down arrow
+         * 
+         * @type {string}
+         */
+        this.dropdownArrowHtml = config.dropdownArrowHtml || '▼';
+
+        /**
          * Determines if robust links object will auto run on all present links
          * Defaults to True
          * 
@@ -282,7 +236,7 @@ export class RobustLinksV2 {
 
                 // Check if a specific dataProducer function is provided
                 if (typeof autoInitConfig.dataProducer === 'function') {
-                    autoInitDataProducer = autoInitConfig.dataProducer;
+                    autoInitDataProducer = autoInitConfig.dataProducer.bind(this);
                     this.logDebug('RobustLinksV2: Auto-initializing with specified selector and custom data producer.');
                 }
                 // If dataProducer is undefined (not provided in the config object)
@@ -290,13 +244,11 @@ export class RobustLinksV2 {
                     autoInitDataProducer = this._createDefaultDataProducer();
                     this.logDebug('RobustLinksV2: Auto-initializing with specified selector and default data producer.');
                 }
-                // If dataProducer was provided but it's not a function (e.g., null, true, false, a string, etc.)
                 else {
                     console.warn("RobustLinksV2: 'autoInit' object provided with an invalid 'dataProducer' (expected a function or undefined). Skipping automatic robust link creation.");
                     autoInitDataProducer = undefined;
                 }
 
-                // Execute makeAllLinksRobust if a dataProducer was determined
                 if (autoInitDataProducer) {
                     this.makeAllLinksRobust(autoInitSelector, autoInitDataProducer, autoInitRootElement);
                 }
@@ -687,29 +639,40 @@ export class RobustLinksV2 {
 
         const dropdownArrow = document.createElement('span');
         dropdownArrow.className = 'robust-dropdown-arrow';
-        dropdownArrow.textContent = '▼'; // Unicode down arrow
+
+        // --- CHANGE HERE: Use innerHTML to insert custom HTML markup for the icon ---
+        dropdownArrow.innerHTML = this.dropdownArrowHtml;
+        // If you were using a direct DaisyUI icon class like 'chevron-down' from their heroicons set,
+        // it might look something like this if you wanted to hardcode it:
+        // dropdownArrow.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>';
+
+        // You might still want these styles for consistent positioning or if the icon library doesn't handle them
+        // or if you want to override the library's default color/size
         dropdownArrow.style.color = this.dropdownArrowColor;
-        dropdownArrow.style.fontSize = this.dropdownArrowSize;
+        dropdownArrow.style.fontSize = this.dropdownArrowSize; // May need adjustment based on SVG size
         dropdownArrow.style.marginLeft = '4px';
         dropdownArrow.style.cursor = 'pointer';
-        dropdownArrow.style.display = 'inline-block'; // Ensure it aligns nicely
+        dropdownArrow.style.display = 'inline-block';
         dropdownArrow.style.verticalAlign = 'middle'; // Adjust vertical alignment
 
         const dropdownMenu = document.createElement('div');
+        // ... (rest of dropdownMenu setup, no changes needed here) ...
         dropdownMenu.className = 'robust-dropdown-menu';
-        dropdownMenu.style.display = 'none'; // Hidden by default
+        dropdownMenu.style.display = 'none';
         dropdownMenu.style.position = 'absolute';
         dropdownMenu.style.backgroundColor = '#f9f9f9';
         dropdownMenu.style.minWidth = '160px';
         dropdownMenu.style.boxShadow = '0px 8px 16px 0px rgba(0,0,0,0.2)';
-        dropdownMenu.style.zIndex = '1000'; // Ensure it's on top
+        dropdownMenu.style.zIndex = '1000';
         dropdownMenu.style.padding = '8px 0';
         dropdownMenu.style.borderRadius = '4px';
+        dropdownMenu.style.top = '100%';
+        dropdownMenu.style.left = '0';
 
         const archivedLinkOption = document.createElement('a');
-        archivedLinkOption.href = this.createMementoUri(originalUrl); // Generate the Memento URI
+        archivedLinkOption.href = this.createMementoUri(originalUrl);
         archivedLinkOption.textContent = 'Archived Version';
-        archivedLinkOption.target = '_blank'; // Open in new tab
+        archivedLinkOption.target = '_blank';
         archivedLinkOption.className = 'robust-dropdown-option';
         archivedLinkOption.style.padding = '8px 16px';
         archivedLinkOption.style.textDecoration = 'none';
@@ -719,9 +682,9 @@ export class RobustLinksV2 {
         archivedLinkOption.onmouseout = (e) => (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
 
         const currentLinkOption = document.createElement('a');
-        currentLinkOption.href = anchorElement.href; // The current href of the robust link
+        currentLinkOption.href = anchorElement.href;
         currentLinkOption.textContent = 'Current Destination';
-        currentLinkOption.target = '_blank'; // Open in new tab
+        currentLinkOption.target = '_blank';
         currentLinkOption.className = 'robust-dropdown-option';
         currentLinkOption.style.padding = '8px 16px';
         currentLinkOption.style.textDecoration = 'none';
@@ -730,7 +693,6 @@ export class RobustLinksV2 {
         currentLinkOption.onmouseover = (e) => (e.currentTarget as HTMLElement).style.backgroundColor = '#f1f1f1';
         currentLinkOption.onmouseout = (e) => (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
 
-
         dropdownMenu.appendChild(archivedLinkOption);
         dropdownMenu.appendChild(currentLinkOption);
         wrapper.appendChild(dropdownArrow);
@@ -738,8 +700,8 @@ export class RobustLinksV2 {
 
         // Toggle dropdown visibility
         dropdownArrow.addEventListener('click', (event) => {
-            event.preventDefault(); // Prevent the link from being followed
-            event.stopPropagation(); // Stop event from bubbling up
+            event.preventDefault();
+            event.stopPropagation();
             dropdownMenu.style.display = dropdownMenu.style.display === 'none' ? 'block' : 'none';
         });
 
@@ -819,15 +781,8 @@ export class RobustLinksV2 {
                 this.logDebug(`RobustLinksV2: Skipping "${originalUrl}" for default robustification (invalid or already archive).`);
                 return null;
             }
+            const versionDate = new Date(); 
 
-            // For a default, we'll use the current date as the versionDate.
-            // In a more advanced scenario, you'd fetch the document's publication date
-            // or last-modified date.
-            const versionDate = new Date(); // Current date/time
-
-            // The new href will be the TimeGate URL, which defaults to the latest memento.
-            // Note: We don't provide a specific datetime to `createMementoUri` here,
-            // so it generates the URI-G (TimeGate for latest).
             const newHref = this.createMementoUri(originalUrl);
 
             this.logDebug(`RobustLinksV2: Default data producer for "${originalUrl}" generated new href: "${newHref}"`);
@@ -836,7 +791,7 @@ export class RobustLinksV2 {
                 originalUrl: originalUrl,
                 versionDate: versionDate,
                 newHref: newHref,
-                versionSnapshots: [] // Explicitly include an empty array to match the type definition
+                versionSnapshots: [] 
             };
         };
     }
@@ -867,5 +822,37 @@ export class RobustLinksV2 {
         if (this.debug) {
             console.log(`[${this.NAME} DEBUG] ${message}`, ...optionalParams);
         }
+    }
+
+    /**
+     * Loads archive patterns from JSON and compiles them into an array of RegExp objects.
+     * @private
+     * @returns {Promise<void>} A promise that resolves when patterns are loaded and compiled.
+     */
+    private async _loadAndCompileArchivePatterns(): Promise<void> {
+        try {
+            const response = await fetch('./archiveExclusions.json'); // Adjust path as needed
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const archivePatterns: string[] = await response.json();
+            this._archivePatternRegexes = archivePatterns.map(pattern => {
+                const processedPattern = pattern.replace(/\./g, '\\.');
+                return new RegExp(`^${processedPattern}`, 'i');
+            });
+            this.logDebug('RobustLinksV2: Archive patterns loaded and compiled.');
+        } catch (error) {
+            console.error('RobustLinksV2: Error loading archive exclusion patterns:', error);
+            // Decide how to handle this error: maybe proceed without exclusions, or prevent functionality.
+            this._archivePatternRegexes = []; // Fail gracefully with empty patterns
+        }
+    }
+
+    /**
+     * Helper to get the promise that resolves when patterns are loaded.
+     * Useful for external code that might need to wait.
+     */
+    public async getExclusionsReadyPromise(): Promise<void> {
+        return this._patternsLoadingPromise || Promise.resolve(); // Return existing promise or resolved if not loading
     }
 }
