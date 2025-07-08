@@ -118,6 +118,17 @@ export interface RobustLinksConfig {
 }
 
 /**
+ * Options for creating a dropdown options
+ * config.
+
+ */
+export interface DropdownOptionConfig {
+    text: string;
+    href: string;
+    targetBlank?: boolean; 
+}
+
+/**
  * Defines the accepted formats for data-versiondate and snapshot datetimes.
  * -YYYY-MM-DD (ISO8601 date)
  * -YYYY-MM-DDThh:mm:ssZ (ISO8601 datetime UTC)
