@@ -218,42 +218,7 @@ export class RobustLinksV2 {
         const autoInitConfig = config.autoInit !== undefined ? config.autoInit : true;
 
         // --- Auto-initialization based on config ---
-        if (autoInitConfig) {
-            this.logDebug('RobustLinksV2: Auto-initialization enabled.');
-
-            // Determine the dataProducer and selector based on autoInit config
-            let autoInitSelector: string = 'a:not([data-originalurl])'; // Default: target non-robust links
-            let autoInitDataProducer: ((anchor: HTMLAnchorElement, index: number) => { originalUrl: string; versionDate: Date; versionSnapshots?: RobustLinkSnapshot[]; newHref?: string; } | null | undefined) | undefined;
-            let autoInitRootElement: HTMLElement | undefined = undefined;
-
-            if (typeof autoInitConfig === 'boolean' && autoInitConfig === true) {
-                // If just `autoInit: true`, use the default data producer
-                autoInitDataProducer = this._createDefaultDataProducer();
-                this.logDebug('RobustLinksV2: Auto-initializing with default selector and data producer.');
-            } else if (typeof autoInitConfig === 'object') {
-                autoInitSelector = autoInitConfig.selector || autoInitSelector;
-                autoInitRootElement = autoInitConfig.rootElement;
-
-                // Check if a specific dataProducer function is provided
-                if (typeof autoInitConfig.dataProducer === 'function') {
-                    autoInitDataProducer = autoInitConfig.dataProducer.bind(this);
-                    this.logDebug('RobustLinksV2: Auto-initializing with specified selector and custom data producer.');
-                }
-                // If dataProducer is undefined (not provided in the config object)
-                else if (autoInitConfig.dataProducer === undefined) {
-                    autoInitDataProducer = this._createDefaultDataProducer();
-                    this.logDebug('RobustLinksV2: Auto-initializing with specified selector and default data producer.');
-                }
-                else {
-                    console.warn("RobustLinksV2: 'autoInit' object provided with an invalid 'dataProducer' (expected a function or undefined). Skipping automatic robust link creation.");
-                    autoInitDataProducer = undefined;
-                }
-
-                if (autoInitDataProducer) {
-                    this.makeAllLinksRobust(autoInitSelector, autoInitDataProducer, autoInitRootElement);
-                }
-            }
-        }
+        this._initAuto(autoInitConfig);
     }
 
     // ---- EXTERNAL FUNCTIONS ----
@@ -758,6 +723,14 @@ export class RobustLinksV2 {
         return updatedLinks;
     }
 
+    /**
+     * Helper to get the promise that resolves when patterns are loaded.
+     * Useful for external code that might need to wait.
+     */
+    public async getExclusionsReadyPromise(): Promise<void> {
+        return this._patternsLoadingPromise || Promise.resolve(); // Return existing promise or resolved if not loading
+    }
+
     // ------ INTERNAL FUNCTIONS --------
 
     /**
@@ -848,11 +821,52 @@ export class RobustLinksV2 {
         }
     }
 
+
     /**
-     * Helper to get the promise that resolves when patterns are loaded.
-     * Useful for external code that might need to wait.
+     * Autoinitializes the robust links class based off of a config, selecting specific links to be made
+     * Robust, with custom dropdown arrows.
+     * 
+     * @private
+     * @returns {null}
      */
-    public async getExclusionsReadyPromise(): Promise<void> {
-        return this._patternsLoadingPromise || Promise.resolve(); // Return existing promise or resolved if not loading
+    private _initAuto(autoInitConfig: RobustLinksConfig['autoInit']): void {
+        if (!autoInitConfig) {
+            return; 
+        }
+
+        this.logDebug('RobustLinksV2: Auto-initialization enabled.');
+
+        let autoInitSelector: string = 'a:not([data-originalurl])';
+        let autoInitDataProducer: ((anchor: HTMLAnchorElement, index: number) => {
+            originalUrl: string;
+            versionDate: Date;
+            versionSnapshots?: RobustLinkSnapshot[];
+            newHref?: string;
+        } | null | undefined) | undefined;
+        let autoInitRootElement: HTMLElement | undefined = undefined;
+
+        if (typeof autoInitConfig === 'boolean' && autoInitConfig === true) {
+            autoInitDataProducer = this._createDefaultDataProducer();
+            this.logDebug('RobustLinksV2: Auto-initializing with default selector and data producer.');
+        } else if (typeof autoInitConfig === 'object') {
+            autoInitSelector = autoInitConfig.selector || autoInitSelector;
+            autoInitRootElement = autoInitConfig.rootElement;
+
+            if (typeof autoInitConfig.dataProducer === 'function') {
+                autoInitDataProducer = autoInitConfig.dataProducer.bind(this);
+                this.logDebug('RobustLinksV2: Auto-initializing with specified selector and custom data producer.');
+            } else if (autoInitConfig.dataProducer === undefined) {
+                autoInitDataProducer = this._createDefaultDataProducer();
+                this.logDebug('RobustLinksV2: Auto-initializing with specified selector and default data producer.');
+            } else {
+                console.warn("RobustLinksV2: 'autoInit' object provided with an invalid 'dataProducer' (expected a function or undefined). Skipping automatic robust link creation.");
+                autoInitDataProducer = undefined;
+            }
+
+            if (autoInitDataProducer) {
+                this.makeAllLinksRobust(autoInitSelector, autoInitDataProducer, autoInitRootElement);
+            }
+        }
     }
+
 }
