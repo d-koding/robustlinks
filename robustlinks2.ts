@@ -18,27 +18,102 @@
 */
 
 /**
- * Interface defining the configuration options for RobustLinksV2.
+ * Configuration options for the RobustLinksV2 instance.
  * All properties are optional as they will have default values set in the constructor.
  */
 export interface RobustLinksConfig {
+    /**
+     * An optional unique identifier for the RobustLinksV2 instance.
+     * Useful for debugging when multiple instances might exist.
+     * Defaults to a combination of the library's name and version (e.g., "RobustLinksV2:3.0.0").
+     */
     id?: string;
+
+    /**
+     * If `true`, enables verbose logging of debug messages to the console.
+     * Defaults to `false`.
+     */
     debug?: boolean;
+
+    /**
+     * The base URL of the Memento TimeGate service used for archive lookups.
+     * This URL should typically end with a slash.
+     * Defaults to "https://web.archive.org/".
+     */
     timeGate?: string;
+
+    /**
+     * Controls the automatic discovery and conversion of links into Robust Links
+     * when the `RobustLinksV2` instance is initialized.
+     *
+     * - `true`: Enables auto-initialization with default behavior. Links matching
+     * `a:not([data-originalurl])` will be processed using a default data producer.
+     * - `false`: Disables auto-initialization.
+     * - `object`: Provides fine-grained control over the auto-initialization process.
+     */
     autoInit?: boolean | {
-        selector?: string; 
-        dataProducer?: (anchor: HTMLAnchorElement, index: number) => {
+        /**
+         * A CSS selector string that targets specific `<a>` elements for auto-initialization.
+         * For example, `'.my-content a'` to process links within a specific div.
+         * Defaults to `'a:not([data-originalurl])'` (i.e., anchors without the robust link marker).
+         */
+        selector?: string;
+
+        /**
+         * A custom function that provides the necessary data (`originalUrl`, `versionDate`, etc.)
+         * to convert a regular HTML `<a>` element into a Robust Link.
+         *
+         * @param anchor The `HTMLAnchorElement` currently being processed.
+         * @param index The zero-based index of the `anchor` within the queried list.
+         * @returns An object containing the robust link data, or `null` to skip this anchor.
+         * Returning `undefined` will also skip the anchor.
+         */
+        dataProducer?: (
+            anchor: HTMLAnchorElement,
+            index: number
+        ) => {
             originalUrl: string;
             versionDate: Date;
             versionSnapshots?: RobustLinkSnapshot[];
             newHref?: string;
-        } | null | undefined;
+        } | null | undefined; // Keep null | undefined for flexibility in user-provided functions
+
+        /**
+         * The root HTML element within which the `selector` should search for links.
+         * For example, `document.getElementById('main-content')`.
+         * Defaults to `document.body`.
+         */
         rootElement?: HTMLElement;
-    
-    }
+    };
+
+    /**
+     * If `true`, a small dropdown arrow will be appended next to Robust Links.
+     * Clicking this arrow will reveal a menu (e.g., "Archived Version", "Current Destination").
+     * Defaults to `false`.
+     */
     enableDropdown?: boolean;
+
+    /**
+     * The CSS color value for the dropdown arrow.
+     * Examples: `"#333"`, `"blue"`, `"rgb(51, 51, 51)"`.
+     * Defaults to `"#333"`.
+     */
     dropdownArrowColor?: string;
+
+    /**
+     * The CSS font-size value for the dropdown arrow.
+     * Examples: `'6px'`, `'0.8em'`, `'1rem'`.
+     * This primarily affects text-based arrows (`dropdownArrowHtml`).
+     * Defaults to `'6px'`.
+     */
     dropdownArrowSize?: string;
+
+    /**
+     * A custom HTML string to be used for the dropdown arrow icon.
+     * Can be a simple character (e.g., '▼'), an SVG icon, or an HTML entity.
+     * Example: `'<svg ...></svg>'` for a custom icon.
+     * Defaults to `'▼'`.
+     */
     dropdownArrowHtml?: string;
 }
 
