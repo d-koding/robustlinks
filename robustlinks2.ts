@@ -678,93 +678,6 @@ export class RobustLinksV2 {
     }
 
     /**
-     * Attaches a dropdown arrow and menu to a robust link.
-     * @param anchorElement The robust link (HTMLAnchorElement).
-     * @param originalUrl The original URL of the link, used for the archived link option.
-     */
-    private _attachDropdownToLink(anchorElement: HTMLAnchorElement, originalUrl: string): void {
-        const wrapper = document.createElement('span');
-        wrapper.className = 'robust-link-wrapper';
-        anchorElement.parentNode?.insertBefore(wrapper, anchorElement);
-        wrapper.appendChild(anchorElement);
-
-        const dropdownArrow = document.createElement('span');
-        dropdownArrow.className = 'robust-dropdown-arrow';
-
-        // --- CHANGE HERE: Use innerHTML to insert custom HTML markup for the icon ---
-        dropdownArrow.innerHTML = this.dropdownArrowHtml;
-        // If you were using a direct DaisyUI icon class like 'chevron-down' from their heroicons set,
-        // it might look something like this if you wanted to hardcode it:
-        // dropdownArrow.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>';
-
-        // You might still want these styles for consistent positioning or if the icon library doesn't handle them
-        // or if you want to override the library's default color/size
-        dropdownArrow.style.color = this.dropdownArrowColor;
-        dropdownArrow.style.fontSize = this.dropdownArrowSize; // May need adjustment based on SVG size
-        dropdownArrow.style.marginLeft = '4px';
-        dropdownArrow.style.cursor = 'pointer';
-        dropdownArrow.style.display = 'inline-block';
-        dropdownArrow.style.verticalAlign = 'middle'; // Adjust vertical alignment
-
-        const dropdownMenu = document.createElement('div');
-        // ... (rest of dropdownMenu setup, no changes needed here) ...
-        dropdownMenu.className = 'robust-dropdown-menu';
-        dropdownMenu.style.display = 'none';
-        dropdownMenu.style.position = 'absolute';
-        dropdownMenu.style.backgroundColor = '#f9f9f9';
-        dropdownMenu.style.minWidth = '160px';
-        dropdownMenu.style.boxShadow = '0px 8px 16px 0px rgba(0,0,0,0.2)';
-        dropdownMenu.style.zIndex = '1000';
-        dropdownMenu.style.padding = '8px 0';
-        dropdownMenu.style.borderRadius = '4px';
-        dropdownMenu.style.top = '100%';
-        dropdownMenu.style.left = '0';
-
-        const archivedLinkOption = document.createElement('a');
-        archivedLinkOption.href = this.createMementoUri(originalUrl);
-        archivedLinkOption.textContent = 'Archived Version';
-        archivedLinkOption.target = '_blank';
-        archivedLinkOption.className = 'robust-dropdown-option';
-        archivedLinkOption.style.padding = '8px 16px';
-        archivedLinkOption.style.textDecoration = 'none';
-        archivedLinkOption.style.display = 'block';
-        archivedLinkOption.style.color = '#333';
-        archivedLinkOption.onmouseover = (e) => (e.currentTarget as HTMLElement).style.backgroundColor = '#f1f1f1';
-        archivedLinkOption.onmouseout = (e) => (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
-
-        const currentLinkOption = document.createElement('a');
-        currentLinkOption.href = anchorElement.href;
-        currentLinkOption.textContent = 'Current Destination';
-        currentLinkOption.target = '_blank';
-        currentLinkOption.className = 'robust-dropdown-option';
-        currentLinkOption.style.padding = '8px 16px';
-        currentLinkOption.style.textDecoration = 'none';
-        currentLinkOption.style.display = 'block';
-        currentLinkOption.style.color = '#333';
-        currentLinkOption.onmouseover = (e) => (e.currentTarget as HTMLElement).style.backgroundColor = '#f1f1f1';
-        currentLinkOption.onmouseout = (e) => (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
-
-        dropdownMenu.appendChild(archivedLinkOption);
-        dropdownMenu.appendChild(currentLinkOption);
-        wrapper.appendChild(dropdownArrow);
-        wrapper.appendChild(dropdownMenu);
-
-        // Toggle dropdown visibility
-        dropdownArrow.addEventListener('click', (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            dropdownMenu.style.display = dropdownMenu.style.display === 'none' ? 'block' : 'none';
-        });
-
-        // Close dropdown when clicking outside
-        document.addEventListener('click', (event) => {
-            if (!wrapper.contains(event.target as Node)) {
-                dropdownMenu.style.display = 'none';
-            }
-        });
-    }
-
-    /**
      * Iterates through all <a> tags matching a given CSS selector and transforms them
      * into robust links using data provided by a callback function.
      *
@@ -953,6 +866,96 @@ export class RobustLinksV2 {
                 this.makeAllLinksRobust(autoInitSelector, autoInitDataProducer, autoInitRootElement);
             }
         }
+    }
+
+
+    /**
+     * Attaches a dropdown arrow and menu to a robust link.
+     * @param anchorElement The robust link (HTMLAnchorElement).
+     * @param originalUrl The original URL of the link, used for the archived link option.
+     */
+    private _attachDropdownToLink(anchorElement: HTMLAnchorElement, originalUrl: string): void {
+        const wrapper = this._createDropdownWrapper(anchorElement);
+        const dropdownArrow = this._createDropdownArrow();
+        const dropdownMenu = this._createDropdownMenu(anchorElement, originalUrl);
+
+        wrapper.appendChild(dropdownArrow);
+        wrapper.appendChild(dropdownMenu);
+
+        this._setupDropdownEvents(wrapper, dropdownArrow, dropdownMenu);
+    }
+
+    /**
+     * Wraps the anchor element in a span for dropdown UI.
+     * @param anchorElement The robust link (HTMLAnchorElement).
+     */
+    private _createDropdownWrapper(anchorElement: HTMLAnchorElement): HTMLSpanElement {
+        const wrapper = document.createElement('span');
+        wrapper.className = 'robust-link-wrapper';
+        anchorElement.parentNode?.insertBefore(wrapper, anchorElement);
+        wrapper.appendChild(anchorElement);
+        return wrapper;
+    }
+
+    /**
+     * Creates the dropdown arrow element.
+     */
+    private _createDropdownArrow(): HTMLSpanElement {
+        const dropdownArrow = document.createElement('span');
+        dropdownArrow.className = 'robust-dropdown-arrow';
+        dropdownArrow.innerHTML = this.dropdownArrowHtml;
+        return dropdownArrow;
+    }
+
+    /**
+     * Creates the dropdown menu with options.
+     * @param anchorElement The robust link (HTMLAnchorElement).
+     * @param originalUrl The original URL of the link, used for the archived link option.
+     */
+    private _createDropdownMenu(anchorElement: HTMLAnchorElement, originalUrl: string): HTMLDivElement {
+        const dropdownMenu = document.createElement('div');
+        dropdownMenu.className = 'robust-dropdown-menu';
+
+        const archivedLinkOption = document.createElement('a');
+        archivedLinkOption.href = this.createMementoUri(originalUrl);
+        archivedLinkOption.textContent = 'Archived Version';
+        archivedLinkOption.target = '_blank';
+        archivedLinkOption.className = 'robust-dropdown-option';
+
+        const currentLinkOption = document.createElement('a');
+        currentLinkOption.href = anchorElement.href;
+        currentLinkOption.textContent = 'Current Destination';
+        currentLinkOption.target = '_blank';
+        currentLinkOption.className = 'robust-dropdown-option';
+
+        dropdownMenu.appendChild(archivedLinkOption);
+        dropdownMenu.appendChild(currentLinkOption);
+
+        return dropdownMenu;
+    }
+
+    /**
+     * Sets up event listeners for dropdown arrow and menu.
+     * @param wrapper the main container element that holds oth the dropdown arrow nad the dropdown menu
+     * @param dropdownArrow the clickable element that, when interacted with (clicked or hovered), toggles the visibility of the dropdown menu
+     * @param dropdownMenu the element htat contians the dropdown options.
+     */
+    private _setupDropdownEvents(
+        wrapper: HTMLElement,
+        dropdownArrow: HTMLElement,
+        dropdownMenu: HTMLElement
+    ): void {
+        dropdownArrow.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            dropdownMenu.classList.toggle('show');
+        });
+
+        document.addEventListener('click', (event) => {
+            if (!wrapper.contains(event.target as Node)) {
+                dropdownMenu.classList.remove('show');
+            }
+        });
     }
 
 }
