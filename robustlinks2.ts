@@ -1,3 +1,6 @@
+import * as RobustLinkTypes from './robustlinks.types';
+
+
 /** robustlinks2.ts
  *
  * @overview A general purpose library for handling Robust Link data.
@@ -17,172 +20,6 @@
  * Realistically, this should be a browser extension
  *
 */
-
-/**
- * Configuration options for the RobustLinksV2 instance.
- * All properties are optional as they will have default values set in the constructor.
- */
-export interface RobustLinksConfig {
-    /**
-     * An optional unique identifier for the RobustLinksV2 instance.
-     * Useful for debugging when multiple instances might exist.
-     * 
-     * @default {"RobustLinksV2:3.0.0"}
-     */
-    id?: string;
-
-    /**
-     * If `true`, enables verbose logging of debug messages to the console.
-     * 
-     * @default {false}
-     */
-    debug?: boolean;
-
-    /**
-     * The base URL of the Memento TimeGate service used for archive lookups.
-     * This URL should typically end with a slash.
-     * 
-     * @default {https://web.archive.org/}
-     */
-    timeGate?: string;
-
-    /**
-     * Controls the automatic discovery and conversion of links into Robust Links
-     * when the `RobustLinksV2` instance is initialized.
-     *
-     * - `true`: Enables auto-initialization with default behavior. Links matching
-     * `a:not([data-originalurl])` will be processed using a default data producer.
-     * - `false`: Disables auto-initialization.
-     * - `object`: Provides fine-grained control over the auto-initialization process.
-     */
-    autoInit?: boolean | {
-        /**
-         * A CSS selector string that targets specific `<a>` elements for auto-initialization.
-         * For example, `'.my-content a'` to process links within a specific div.
-         * 
-         * @default {'a:not([data-originalurl])'} 
-         */
-        selector?: string;
-
-        /**
-         * A custom function that provides the necessary data (`originalUrl`, `versionDate`, etc.)
-         * to convert a regular HTML `<a>` element into a Robust Link.
-         *
-         * @param anchor The `HTMLAnchorElement` currently being processed.
-         * @param index The zero-based index of the `anchor` within the queried list.
-         * @returns An object containing the robust link data, or `null` to skip this anchor.
-         * Returning `undefined` will also skip the anchor.
-         */
-        dataProducer?: (
-            anchor: HTMLAnchorElement,
-            index: number
-        ) => {
-            originalUrl: string;
-            versionDate: Date;
-            versionSnapshots?: RobustLinkSnapshot[];
-            newHref?: string;
-        } | null | undefined; // Keep null | undefined for flexibility in user-provided functions
-
-        /**
-         * The root HTML element within which the `selector` should search for links.
-         * For example, `document.getElementById('main-content')`.
-         * 
-         * @default {document.body}.
-         */
-        rootElement?: HTMLElement;
-    };
-
-    /**
-     * If `true`, a small dropdown arrow will be appended next to Robust Links.
-     * Clicking this arrow will reveal a menu (e.g., "Archived Version", "Current Destination").
-     * 
-     * @default {false}
-     */
-    enableDropdown?: boolean;
-
-    /**
-     * The CSS color value for the dropdown arrow.
-     * Examples: `"#333"`, `"blue"`, `"rgb(51, 51, 51)"`.
-     * 
-     * @default {"#333"`}
-     */
-    dropdownArrowColor?: string;
-
-    /**
-     * The CSS font-size value for the dropdown arrow.
-     * Examples: `'6px'`, `'0.8em'`, `'1rem'`.
-     * This primarily affects text-based arrows (`dropdownArrowHtml`).
-     * 
-     * @default {6px}
-     */
-    dropdownArrowSize?: string;
-
-    /**
-     * A custom HTML string to be used for the dropdown arrow icon.
-     * Can be a simple character (e.g., '▼'), an SVG icon, or an HTML entity.
-     * Example: `'<svg ...></svg>'` for a custom icon.
-     * 
-     * @default {▼}
-     */
-    dropdownArrowHtml?: string;
-}
-
-/**
- * Options for creating a dropdown options
- * config.
-
- */
-export interface DropdownOptionConfig {
-    text: string;
-    href: string;
-    targetBlank?: boolean; 
-}
-
-/**
- * Defines the accepted formats for data-versiondate and snapshot datetimes.
- * -YYYY-MM-DD (ISO8601 date)
- * -YYYY-MM-DDThh:mm:ssZ (ISO8601 datetime UTC)
- * -YYYYMMDD (Web Archive URI date)
- * -YYYYMMDDhhmmss (Web Archive URI datetime)
- */
-export type RobustLinkDatetimeString = string; // Validation handled by parseDatetime function
-
-/**
- * Represents a single snapshot entry within the data-versionurl attribute.
- */
-export interface RobustLinkSnapshot {
-    /** The URI of the snapshot. Must be absolute. */
-    uri: string;
-    /** The datetime the snapshot was created, if provided. Interpreted as noon UTC if date-only. */
-    datetime?: RobustLinkDatetimeString;
-}
-
-/**
- * Represents the raw HTML data- attributes used for a Robust Link.
- * These are the strings directly read from the DOM.
- */
-export interface RobustLinkRawAttributes {
-    href: string;
-    'data-originalurl'?: string;
-    'data-versiondate'?: string;
-    'data-versionurl'?: string;
-}
-
-/**
- * A more structured and parsed representation of a Robust Link after validation.
- */
-export interface ParsedRobustLink {
-    /** The default link target URI. */
-    href: string;
-    /** The URI of the resource that motivates the Robust Link. Always absolute. */
-    originalUrl: string;
-    /** The intended linking datetime, parsed into a Date object (UTC). */
-    versionDate: Date;
-    /** An array of parsed snapshot URIs and their datetimes. */
-    versionSnapshots: RobustLinkSnapshot[];
-    /** The original HTML text content of the <a> tag. */
-    linkText?: string;
-}
 
 
 /**
@@ -219,7 +56,7 @@ export class RobustLinksV2 {
      * Default values are provided for all configurable properties.
      *
      * @param {RobustLinksConfig} [config] - Optional configuration options to override @default    */
-    constructor(config?: RobustLinksConfig) {
+    constructor(config?: RobustLinkTypes.RobustLinksConfig) {
         /**
          * Ensures config is initialized
          * 
@@ -383,7 +220,7 @@ export class RobustLinksV2 {
      * @param datetimeStr The datetime string to parse.
      * @returns A Date object representing the parsed datetime, or null if invalid.
      */
-    public static parseDatetime(datetimeStr: RobustLinkDatetimeString): Date | null {
+    public static parseDatetime(datetimeStr: RobustLinkTypes.RobustLinkDatetimeString): Date | null {
         // ISO8601 Date: YYYY-MM-DD
         const isoDateMatch = datetimeStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
         if (isoDateMatch) {
@@ -442,12 +279,12 @@ export class RobustLinksV2 {
      * @param versionUrlString The raw string value of the data-versionurl attribute.
      * @returns An array of RobustLinkSnapshot.
      */
-    public static parseVersionUrl(versionUrlString: string | undefined): RobustLinkSnapshot[] {
+    public static parseVersionUrl(versionUrlString: string | undefined): RobustLinkTypes.RobustLinkSnapshot[] {
         if (!versionUrlString) {
             return [];
         }
 
-        const snapshots: RobustLinkSnapshot[] = [];
+        const snapshots: RobustLinkTypes.RobustLinkSnapshot[] = [];
         // Split by space, then filter out empty strings to handle multiple spaces
         const parts = versionUrlString.split(' ').filter(part => part.length > 0);
         let i = 0;
@@ -491,7 +328,7 @@ export class RobustLinksV2 {
      * @param defaultLinkText Optional text content of the <a> tag, used for the `linkText` property.
      * @returns A ParsedRobustLink object.
      * @throws {Error} if required attributes are missing or invalid, even after attempting @default    */
-    public parseRobustLink(rawAttributes: RobustLinkRawAttributes, defaultLinkText?: string): ParsedRobustLink {
+    public parseRobustLink(rawAttributes: RobustLinkTypes.RobustLinkRawAttributes, defaultLinkText?: string): RobustLinkTypes.ParsedRobustLink {
         let { href, 'data-originalurl': originalUrl, 'data-versiondate': versionDateStr, 'data-versionurl': versionUrlStr } = rawAttributes;
 
         // Apply default for data-originalurl if missing (Section 3.5)
@@ -554,9 +391,9 @@ export class RobustLinksV2 {
      * @param rootElement The HTML element to search within. @default `document.body`.
      * @returns An array of ParsedRobustLink objects found.
      */
-    public findAndParseRobustLinks(rootElement?: HTMLElement): ParsedRobustLink[] {
+    public findAndParseRobustLinks(rootElement?: HTMLElement): RobustLinkTypes.ParsedRobustLink[] {
         this.logDebug('RobustLinksV2: Searching for and parsing existing robust links.');
-        const links: ParsedRobustLink[] = [];
+        const links: RobustLinkTypes.ParsedRobustLink[] = [];
         const scope = rootElement || document.body;
         const anchorElements = scope.querySelectorAll('a[data-originalurl][data-versiondate]'); // Select only potential robust links
 
@@ -567,7 +404,7 @@ export class RobustLinksV2 {
             const dataVersionUrl = anchor.getAttribute('data-versionurl');
             const linkText = anchor.textContent || undefined; // Get link text, default to undefined if empty
 
-            const rawAttributes: RobustLinkRawAttributes = {
+            const rawAttributes: RobustLinkTypes.RobustLinkRawAttributes = {
                 href: href || '', // Ensure href is always a string for the interface
                 'data-originalurl': dataOriginalUrl || undefined,
                 'data-versiondate': dataVersionDate || undefined,
@@ -592,7 +429,7 @@ export class RobustLinksV2 {
      * @param parsedLink The ParsedRobustLink object to convert into HTML.
      * @returns A string representing the HTML <a> tag.
      */
-    public createRobustLinkHtml(parsedLink: ParsedRobustLink): string {
+    public createRobustLinkHtml(parsedLink: RobustLinkTypes.ParsedRobustLink): string {
         // Format versionDate to YYYY-MM-DD for data-versiondate attribute
         // Note: Date.toISOString() gives YYYY-MM-DDTHH:mm:ss.sssZ, we only want the date part.
         const versionDateStr = parsedLink.versionDate.toISOString().split('T')[0];
@@ -642,7 +479,7 @@ export class RobustLinksV2 {
         options: {
             originalUrl: string;
             versionDate: Date;
-            versionSnapshots?: RobustLinkSnapshot[];
+            versionSnapshots?: RobustLinkTypes.RobustLinkSnapshot[];
             newHref?: string;
         }
     ): void {
@@ -702,7 +539,7 @@ export class RobustLinksV2 {
         dataProducer: (anchor: HTMLAnchorElement, index: number) => {
             originalUrl: string;
             versionDate: Date;
-            versionSnapshots?: RobustLinkSnapshot[];
+            versionSnapshots?: RobustLinkTypes.RobustLinkSnapshot[];
             newHref?: string;
         } | null | undefined,
         rootElement?: HTMLElement
@@ -752,7 +589,7 @@ export class RobustLinksV2 {
      *
      * @returns A `dataProducer` function.
      */
-    private _createDefaultDataProducer(): (anchor: HTMLAnchorElement, index: number) => { originalUrl: string; versionDate: Date; versionSnapshots?: RobustLinkSnapshot[]; newHref?: string; } | null | undefined {
+    private _createDefaultDataProducer(): (anchor: HTMLAnchorElement, index: number) => { originalUrl: string; versionDate: Date; versionSnapshots?: RobustLinkTypes.RobustLinkSnapshot[]; newHref?: string; } | null | undefined {
         return (anchor: HTMLAnchorElement, index: number) => { // Keep index: number here for consistency with interface
             const originalUrl = anchor.href;
 
@@ -836,7 +673,7 @@ export class RobustLinksV2 {
      * @private
      * @returns {null}
      */
-    private _initAuto(autoInitConfig: RobustLinksConfig['autoInit']): void {
+    private _initAuto(autoInitConfig: RobustLinkTypes.RobustLinksConfig['autoInit']): void {
         if (!autoInitConfig) {
             return; 
         }
@@ -847,7 +684,7 @@ export class RobustLinksV2 {
         let autoInitDataProducer: ((anchor: HTMLAnchorElement, index: number) => {
             originalUrl: string;
             versionDate: Date;
-            versionSnapshots?: RobustLinkSnapshot[];
+            versionSnapshots?: RobustLinkTypes.RobustLinkSnapshot[];
             newHref?: string;
         } | null | undefined) | undefined;
         let autoInitRootElement: HTMLElement | undefined = undefined;

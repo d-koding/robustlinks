@@ -1,4 +1,5 @@
-import { RobustLinksV2, RobustLinksConfig, ParsedRobustLink, RobustLinkRawAttributes } from '../robustlinks2';
+import { RobustLinksV2 } from '../robustlinks2';
+import * as RobustLinkTypes from '../robustlinks.types';
 
 describe('RobustLinksV2', () => {
     let instance: RobustLinksV2;
@@ -41,7 +42,7 @@ describe('RobustLinksV2', () => {
 
     describe('parseRobustLink', () => {
         it('should parse valid robust link attributes', () => {
-            const attrs: RobustLinkRawAttributes = {
+            const attrs: RobustLinkTypes.RobustLinkRawAttributes = {
                 href: 'https://example.com',
                 'data-originalurl': 'https://example.com',
                 'data-versiondate': '2023-07-09',
@@ -55,7 +56,7 @@ describe('RobustLinksV2', () => {
             expect(parsed.linkText).toBe('Example');
         });
         it('should throw if required attributes are missing', () => {
-            const attrs: RobustLinkRawAttributes = {
+            const attrs: RobustLinkTypes.RobustLinkRawAttributes = {
                 href: '',
                 'data-originalurl': undefined,
                 'data-versiondate': undefined,
@@ -80,7 +81,7 @@ describe('RobustLinksV2', () => {
 
     describe('createRobustLinkHtml', () => {
         it('should generate a valid <a> tag string', () => {
-            const parsed: ParsedRobustLink = {
+            const parsed: RobustLinkTypes.ParsedRobustLink = {
                 href: 'https://example.com',
                 originalUrl: 'https://example.com',
                 versionDate: new Date('2023-07-09T12:00:00Z'),
