@@ -1,4 +1,3 @@
-
 /** robustlinks2.ts
  *
  * @overview A general purpose library for handling Robust Link data.
@@ -14,6 +13,8 @@
  * @author Dylan O'Connor <dylankconnor@gmail.com>
  * @version 3.0.0
  * License can be obtained at http://mementoweb.github.io/SiteStory/license.html
+ * 
+ * Realistically, this should be a browser extension
  *
 */
 
@@ -25,20 +26,23 @@ export interface RobustLinksConfig {
     /**
      * An optional unique identifier for the RobustLinksV2 instance.
      * Useful for debugging when multiple instances might exist.
-     * Defaults to a combination of the library's name and version (e.g., "RobustLinksV2:3.0.0").
+     * 
+     * @default {"RobustLinksV2:3.0.0"}
      */
     id?: string;
 
     /**
      * If `true`, enables verbose logging of debug messages to the console.
-     * Defaults to `false`.
+     * 
+     * @default {false}
      */
     debug?: boolean;
 
     /**
      * The base URL of the Memento TimeGate service used for archive lookups.
      * This URL should typically end with a slash.
-     * Defaults to "https://web.archive.org/".
+     * 
+     * @default {https://web.archive.org/}
      */
     timeGate?: string;
 
@@ -55,7 +59,8 @@ export interface RobustLinksConfig {
         /**
          * A CSS selector string that targets specific `<a>` elements for auto-initialization.
          * For example, `'.my-content a'` to process links within a specific div.
-         * Defaults to `'a:not([data-originalurl])'` (i.e., anchors without the robust link marker).
+         * 
+         * @default {'a:not([data-originalurl])'} 
          */
         selector?: string;
 
@@ -81,7 +86,8 @@ export interface RobustLinksConfig {
         /**
          * The root HTML element within which the `selector` should search for links.
          * For example, `document.getElementById('main-content')`.
-         * Defaults to `document.body`.
+         * 
+         * @default {document.body}.
          */
         rootElement?: HTMLElement;
     };
@@ -89,14 +95,16 @@ export interface RobustLinksConfig {
     /**
      * If `true`, a small dropdown arrow will be appended next to Robust Links.
      * Clicking this arrow will reveal a menu (e.g., "Archived Version", "Current Destination").
-     * Defaults to `false`.
+     * 
+     * @default {false}
      */
     enableDropdown?: boolean;
 
     /**
      * The CSS color value for the dropdown arrow.
      * Examples: `"#333"`, `"blue"`, `"rgb(51, 51, 51)"`.
-     * Defaults to `"#333"`.
+     * 
+     * @default {"#333"`}
      */
     dropdownArrowColor?: string;
 
@@ -104,7 +112,8 @@ export interface RobustLinksConfig {
      * The CSS font-size value for the dropdown arrow.
      * Examples: `'6px'`, `'0.8em'`, `'1rem'`.
      * This primarily affects text-based arrows (`dropdownArrowHtml`).
-     * Defaults to `'6px'`.
+     * 
+     * @default {6px}
      */
     dropdownArrowSize?: string;
 
@@ -112,7 +121,8 @@ export interface RobustLinksConfig {
      * A custom HTML string to be used for the dropdown arrow icon.
      * Can be a simple character (e.g., '▼'), an SVG icon, or an HTML entity.
      * Example: `'<svg ...></svg>'` for a custom icon.
-     * Defaults to `'▼'`.
+     * 
+     * @default {▼}
      */
     dropdownArrowHtml?: string;
 }
@@ -189,7 +199,7 @@ export class RobustLinksV2 {
     private readonly NAME: string = 'RobustLinksV2';
     private readonly VERSION: string = '3.0.0';
 
-    // Public configurable properties, initialized with defaults
+    // Public configurable properties, initialized with @default
     public id: string;
     public urimPattern: string;
     public debug: boolean;
@@ -208,8 +218,7 @@ export class RobustLinksV2 {
      * Creates a new RobustLinksV2 instance with optional configurations.
      * Default values are provided for all configurable properties.
      *
-     * @param {RobustLinksConfig} [config] - Optional configuration options to override defaults.
-     */
+     * @param {RobustLinksConfig} [config] - Optional configuration options to override @default    */
     constructor(config?: RobustLinksConfig) {
         /**
          * Ensures config is initialized
@@ -273,7 +282,7 @@ export class RobustLinksV2 {
 
         /**
          * Initializes color of dropdown arrow, regardless of visibility
-         * Defaults to blue
+         * @default blue
          * 
          * @type {string}
          */
@@ -281,7 +290,7 @@ export class RobustLinksV2 {
 
         /**
          * Initializes the size of the dropdown arrow, regardless of visibility.
-         * Defaults to 6px
+         * @default 6px
          * 
          * @type {string}
          */
@@ -289,7 +298,7 @@ export class RobustLinksV2 {
 
         /**
          * Initializes a custom dropdown arrow, based on string html
-         * defaults to a down arrow
+         * @default a down arrow
          * 
          * @type {string}
          */
@@ -297,7 +306,7 @@ export class RobustLinksV2 {
 
         /**
          * Determines if robust links object will auto run on all present links
-         * Defaults to True
+         * @default True
          * 
          * @type {boolean | object}
          */
@@ -481,8 +490,7 @@ export class RobustLinksV2 {
      * @param rawAttributes The raw attributes from an HTML <a> element.
      * @param defaultLinkText Optional text content of the <a> tag, used for the `linkText` property.
      * @returns A ParsedRobustLink object.
-     * @throws {Error} if required attributes are missing or invalid, even after attempting defaults.
-     */
+     * @throws {Error} if required attributes are missing or invalid, even after attempting @default    */
     public parseRobustLink(rawAttributes: RobustLinkRawAttributes, defaultLinkText?: string): ParsedRobustLink {
         let { href, 'data-originalurl': originalUrl, 'data-versiondate': versionDateStr, 'data-versionurl': versionUrlStr } = rawAttributes;
 
@@ -543,7 +551,7 @@ export class RobustLinksV2 {
      * and parses them into ParsedRobustLink objects.
      * Invalid robust links found will be logged as errors and skipped.
      *
-     * @param rootElement The HTML element to search within. Defaults to `document.body`.
+     * @param rootElement The HTML element to search within. @default `document.body`.
      * @returns An array of ParsedRobustLink objects found.
      */
     public findAndParseRobustLinks(rootElement?: HTMLElement): ParsedRobustLink[] {
@@ -686,8 +694,8 @@ export class RobustLinksV2 {
      * index, and returns an object containing the originalUrl, versionDate,
      * and optional versionSnapshots and newHref for that link.
      * If the function returns null or undefined, the link is skipped.
-     * @param rootElement The HTML element to search within. Defaults to `document.body`.
-     * @returns An array of HTMLAnchorElements that were successfully made robust.
+     * @param rootElement The HTML element to search within. @default `document.body`.
+     * @returns An array of HTMLAnchorElement that were successfully made robust.
      */
     public makeAllLinksRobust(
         selector: string,
