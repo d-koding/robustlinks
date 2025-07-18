@@ -67,24 +67,28 @@ export class RobustLinksV2 {
 
         /**
          * Initializes the ID of the RobustLinksV2 instance.
+         * 
          * @type {string}
          */
         this.id = `${this.NAME}:${this.VERSION}`;
 
         /**
          * Initializes the default TimeGate URL for archive lookups.
+         * 
          * @type {string}
          */
         this.timeGate = config.timeGate || "https://web.archive.org/";
 
         /**
          * Initializes the URI-M pattern used for constructing Memento URIs with a specific datetime.
+         * 
          * @type {string}
          */
         this.urimPattern = `${this.timeGate}<datetime>/<urir>`;
 
         /**
          * Initializes a collection of URL exclusion patterns, primarily for identifying known archive URLs.
+         * 
          * @type {{ [key: string]: (url: string) => boolean }}
          */
         this._patternsLoadingPromise = this._loadAndCompileArchivePatterns();
@@ -105,6 +109,7 @@ export class RobustLinksV2 {
 
         /**
          * Initializes the debug mode setting. If true, debug messages will be logged to the console.
+         * 
          * @type {boolean}
          */
         this.debug = config.debug || false;

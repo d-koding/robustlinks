@@ -7,6 +7,7 @@ describe('RobustLinksV2', () => {
     beforeEach(() => {
         instance = new RobustLinksV2({ debug: false });
     });
+    
 
     describe('isValidAbsoluteUrl', () => {
         it('should validate absolute HTTP/HTTPS URLs', () => {
