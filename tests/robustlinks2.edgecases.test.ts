@@ -7,12 +7,12 @@ const fetchMock = fetch as unknown as jest.MockedFunction<typeof fetch> & {
 };
 
 describe('RobustLinksV2 Edge Case Handling', () => {
+    let rl: RobustLinksV2;
     beforeEach(() => {
         fetchMock.resetMocks();
-        fetchMock.mockResponseOnce(JSON.stringify([])); // Always return valid JSON array
+        rl = new RobustLinksV2({ debug: false });
     });
 
-    const rl = new RobustLinksV2({ debug: false });
 
     test('throws on missing href', () => {
         expect(() => rl.parseRobustLink({ href: '' })).toThrow(/href/);

@@ -583,38 +583,69 @@ export class RobustLinksV2 {
     // ------ INTERNAL FUNCTIONS --------
 
     /**
-     * Creates a default dataProducer function that uses the configured `defaultTimeGate`
-     * to generate robust link data.
+     * Checks if a link is "rotted" by performing a network request.
+     * A link is considered rotted if it returns a non-successful HTTP status code (4xx, 5xx)
+     * or if the request fails completely (e.g., due to a DNS error).
+     * @param url The URL to check.
+     * @returns A promise that resolves to `true` if the link is rotted, `false` otherwise.
+     */
+    private async _isLinkRotted(url: string): Promise<boolean> {
+        try {
+            const response = await fetch(url, { method: 'HEAD' });
+            // Use 'HEAD' method for efficiency to avoid downloading the full content.
+            // A successful response is in the 200-299 range.
+            this.logDebug(`_isLinkRotted: Check for "${url}" returned status ${response.status}`);
+            return !response.ok;
+        } catch (e) {
+            // A network error (e.g., DNS lookup failed, no internet) means the link is rotted.
+            console.error(`RobustLinksV2: Network error when checking link "${url}":`, e);
+            return true;
+        }
+    }
+
+    /**
+     * Creates a default dataProducer function that checks if a link is rotted
+     * before generating robust link data.
      * This function is designed to be used when `autoInit` or `defaultDataProducer` is true.
      * It will:
-     * - Use the `href` of the anchor as the `originalUrl`.
-     * - Set `versionDate` to the current date and time (as a plausible default, but ideally
-     * this would come from server-side data like last-modified or publication date).
-     * - Set `newHref` to the TimeGate URI for the original URL (e.g., `https://web.archive.org/originalUrl`).
+     * - Check if the link is valid and not already an archive.
+     * - **Perform an async check to see if the link is rotted.**
+     * - Only if the link is rotted, it returns a data object to robustify the link.
+     * - Otherwise, it returns null, and the link is skipped.
      *
-     * @returns A `dataProducer` function.
+     * @returns A `dataProducer` function that returns a Promise.
      */
-    private _createDefaultDataProducer(): (anchor: HTMLAnchorElement, index: number) => { originalUrl: string; versionDate: Date; versionSnapshots?: RobustLinkTypes.RobustLinkSnapshot[]; newHref?: string; } | null | undefined {
-        return (anchor: HTMLAnchorElement, index: number) => { // Keep index: number here for consistency with interface
+    private _createDefaultDataProducer(): (anchor: HTMLAnchorElement, index: number) => Promise<{
+        originalUrl: string;
+        versionDate: Date;
+        versionSnapshots?: RobustLinkTypes.RobustLinkSnapshot[];
+        newHref?: string;
+    } | null | undefined> {
+        return async (anchor: HTMLAnchorElement, index: number) => {
             const originalUrl = anchor.href;
 
-            // Only attempt to robustify if the original URL is valid and not already an archive URL
             if (!RobustLinksV2.isValidAbsoluteUrl(originalUrl) || this.isArchiveUrl(originalUrl)) {
-                this.logDebug(`RobustLinksV2: Skipping "${originalUrl}" for default robustification (invalid or already archive).`);
+                this.logDebug(`RobustLinksV2: Skipping "${originalUrl}" (invalid or already archive).`);
                 return null;
             }
-            const versionDate = new Date(); 
 
-            const newHref = this.createMementoUri(originalUrl);
+            const isRotted = await this._isLinkRotted(originalUrl);
 
-            this.logDebug(`RobustLinksV2: Default data producer for "${originalUrl}" generated new href: "${newHref}"`);
-
-            return {
-                originalUrl: originalUrl,
-                versionDate: versionDate,
-                newHref: newHref,
-                versionSnapshots: [] 
-            };
+            if (isRotted) {
+                this.logDebug(`RobustLinksV2: Link "${originalUrl}" is rotted. Robustifying.`);
+                const versionDate = new Date();
+                const newHref = this.createMementoUri(originalUrl);
+                
+                return {
+                    originalUrl: originalUrl,
+                    versionDate: versionDate,
+                    newHref: newHref,
+                    versionSnapshots: [] 
+                };
+            } else {
+                this.logDebug(`RobustLinksV2: Link "${originalUrl}" is healthy. Skipping robustification.`);
+                return null;
+            }
         };
     }
 
@@ -673,12 +704,11 @@ export class RobustLinksV2 {
 
     /**
      * Autoinitializes the robust links class based off of a config, selecting specific links to be made
-     * Robust, with custom dropdown arrows.
-     * 
-     * @private
+     * Robust, with custom dropdown arrows. This is now an async function to handle the link checking.
+     * * @private
      * @returns {null}
      */
-    private _initAuto(autoInitConfig: RobustLinkTypes.RobustLinksConfig['autoInit']): void {
+    private async _initAuto(autoInitConfig: RobustLinkTypes.RobustLinksConfig['autoInit']): Promise<void> {
         if (!autoInitConfig) {
             return; 
         }
@@ -686,12 +716,12 @@ export class RobustLinksV2 {
         this.logDebug('RobustLinksV2: Auto-initialization enabled.');
 
         let autoInitSelector: string = 'a:not([data-originalurl])';
-        let autoInitDataProducer: ((anchor: HTMLAnchorElement, index: number) => {
+        let autoInitDataProducer: ((anchor: HTMLAnchorElement, index: number) => Promise<{
             originalUrl: string;
             versionDate: Date;
             versionSnapshots?: RobustLinkTypes.RobustLinkSnapshot[];
             newHref?: string;
-        } | null | undefined) | undefined;
+        } | null | undefined>) | undefined;
         let autoInitRootElement: HTMLElement | undefined = undefined;
 
         if (typeof autoInitConfig === 'boolean' && autoInitConfig === true) {
@@ -702,20 +732,49 @@ export class RobustLinksV2 {
             autoInitRootElement = autoInitConfig.rootElement;
 
             if (typeof autoInitConfig.dataProducer === 'function') {
-                autoInitDataProducer = autoInitConfig.dataProducer.bind(this);
+                // If a custom data producer is provided, it must also be async.
+                autoInitDataProducer = (anchor: HTMLAnchorElement, index: number) => {
+                    const producerResult = (autoInitConfig.dataProducer as Function).call(this, anchor, index);
+                    // Ensure the result is a Promise
+                    return Promise.resolve(producerResult);
+                };
                 this.logDebug('RobustLinksV2: Auto-initializing with specified selector and custom data producer.');
             } else if (autoInitConfig.dataProducer === undefined) {
                 autoInitDataProducer = this._createDefaultDataProducer();
                 this.logDebug('RobustLinksV2: Auto-initializing with specified selector and default data producer.');
             } else {
-                console.warn("RobustLinksV2: 'autoInit' object provided with an invalid 'dataProducer' (expected a function or undefined). Skipping automatic robust link creation.");
-                autoInitDataProducer = undefined;
+                console.warn("RobustLinksV2: 'autoInit' object provided with an invalid 'dataProducer'. Skipping.");
+                return;
             }
-
-            if (autoInitDataProducer) {
-                this.makeAllLinksRobust(autoInitSelector, autoInitDataProducer, autoInitRootElement);
-            }
+        } else {
+            this.logDebug('RobustLinksV2: Invalid autoInit config, skipping auto-initialization.');
+            return;
         }
+
+        // Wait for the archive patterns to be loaded first
+        await this.getExclusionsReadyPromise();
+
+        // Now, get all links that match the selector and process them.
+        const scope = autoInitRootElement || document.body;
+        const anchorElements = scope.querySelectorAll<HTMLAnchorElement>(autoInitSelector);
+        
+        // Process links asynchronously and in parallel for better performance
+        const updatePromises = Array.from(anchorElements).map(async (anchor, index) => {
+            if (autoInitDataProducer) {
+                try {
+                    const linkData = await autoInitDataProducer(anchor, index);
+                    if (linkData) {
+                        this.updateAnchorToRobustLink(anchor, linkData);
+                    }
+                } catch (error: any) {
+                    console.error(`RobustLinksV2: Error processing link with href "${anchor.href}". Error: ${error.message}`);
+                }
+            }
+        });
+
+        // Wait for all links to be processed
+        await Promise.all(updatePromises);
+        this.logDebug(`RobustLinksV2: Auto-initialization complete. Processed ${anchorElements.length} links.`);
     }
 
 
