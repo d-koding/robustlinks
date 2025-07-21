@@ -9,7 +9,7 @@ This library helps ensure that even if an original web resource changes or disap
 
 ### See it in Action!
 
-<a href="/dist/index.html" style="
+<a href="dist/index.html" style="
     display: inline-block;
     padding: 10px 20px;
     font-size: 16px;
