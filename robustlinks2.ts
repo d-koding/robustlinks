@@ -1,36 +1,5 @@
-import * as RobustLinkTypes from './robustlinks.types';
+import * as RobustLinkTypes from './robustlinks.types'; // Assuming you have this type definition file
 
-
-/** robustlinks2.ts
- *
- * @overview A general purpose library for handling Robust Link data.
- * Provides tools necessary for creating, augmenting, and parsing Robust
- * Links.
- *
- * Currently assumes another client will handle specific data fetching
- * methods for TimeGates and TimeMaps.
- *
- * @author Yorick Chollet <yorick.chollet@gmail.com>
- * @author Harihar Shankar <hariharshankar@gmail.com>
- * @author Shawn M. Jones <jones.shawn.m@gmail.com>
- * @author Dylan O'Connor <dylankconnor@gmail.com>
- * @version 3.0.0
- * License can be obtained at http://mementoweb.github.io/SiteStory/license.html
- * 
- * Realistically, this should be a browser extension
- *
-*/
-
-
-/**
- * The `RobustLinksV2` class provides functionality for managing and configuring
- * robust linking behavior within an application. It includes utilities for
- * validating URLs, managing a list of excluded archive patterns, and parsing
- * and creating Robust Links based on the specification.
- *
- * It can be used as a module to be initialized once and then used throughout
- * your application to manage robust links.
- */
 export class RobustLinksV2 {
     // Internal constants for the module -> Not in the constructor because we want to guarantee imutability
     private readonly NAME: string = 'RobustLinksV2';
@@ -48,47 +17,48 @@ export class RobustLinksV2 {
 
     // Private properties for internal use
     private exclusions: { [key: string]: (url: string) => boolean };
-    private _archivePatternRegexes: RegExp[] | null = null; 
+    private _archivePatternRegexes: RegExp[] | null = null;
     private _patternsLoadingPromise: Promise<void> | null = null;
 
     /**
      * Creates a new RobustLinksV2 instance with optional configurations.
      * Default values are provided for all configurable properties.
      *
-     * @param {RobustLinksConfig} [config] - Optional configuration options to override @default    */
+     * @param {RobustLinksConfig} [config] - Optional configuration options to override @default
+     */
     constructor(config?: RobustLinkTypes.RobustLinksConfig) {
         /**
          * Ensures config is initialized
-         * 
+         *
          * @type {RobustLinksConfig}
-         * 
+         *
          */
         config = config || {};
 
         /**
          * Initializes the ID of the RobustLinksV2 instance.
-         * 
+         *
          * @type {string}
          */
         this.id = `${this.NAME}:${this.VERSION}`;
 
         /**
          * Initializes the default TimeGate URL for archive lookups.
-         * 
+         *
          * @type {string}
          */
         this.timeGate = config.timeGate || "https://web.archive.org/";
 
         /**
          * Initializes the URI-M pattern used for constructing Memento URIs with a specific datetime.
-         * 
+         *
          * @type {string}
          */
         this.urimPattern = `${this.timeGate}<datetime>/<urir>`;
 
         /**
          * Initializes a collection of URL exclusion patterns, primarily for identifying known archive URLs.
-         * 
+         *
          * @type {{ [key: string]: (url: string) => boolean }}
          */
         this._patternsLoadingPromise = this._loadAndCompileArchivePatterns();
@@ -109,23 +79,23 @@ export class RobustLinksV2 {
 
         /**
          * Initializes the debug mode setting. If true, debug messages will be logged to the console.
-         * 
+         *
          * @type {boolean}
          */
         this.debug = config.debug || false;
 
         /**
          * Initializes dropdown arrow as visible or invisible.
-         * 
+         *
          * @type {boolean}
-         * 
+         *
          */
         this.enableDropdown = config.enableDropdown === true;
 
         /**
          * Initializes color of dropdown arrow, regardless of visibility
          * @default blue
-         * 
+         *
          * @type {string}
          */
         this.dropdownArrowColor = config.dropdownArrowColor || "#333";
@@ -133,7 +103,7 @@ export class RobustLinksV2 {
         /**
          * Initializes the size of the dropdown arrow, regardless of visibility.
          * @default 6px
-         * 
+         *
          * @type {string}
          */
         this.dropdownArrowSize = config.dropdownArrowSize || '6px';
@@ -141,18 +111,18 @@ export class RobustLinksV2 {
         /**
          * Initializes a custom dropdown arrow, based on string html
          * @default a down arrow
-         * 
+         *
          * @type {string}
          */
         this.dropdownArrowHtml = config.dropdownArrowHtml || '▼';
 
         /**
          * Determines if robust links object will auto run on all present links
-         * @default True
-         * 
+         * @default false
+         *
          * @type {boolean | object}
          */
-        const autoInitConfig = config.autoInit !== undefined ? config.autoInit : true;
+        const autoInitConfig = config.autoInit !== undefined ? config.autoInit : false;
 
         // --- Auto-initialization based on config ---
         this._initAuto(autoInitConfig);
@@ -332,7 +302,8 @@ export class RobustLinksV2 {
      * @param rawAttributes The raw attributes from an HTML <a> element.
      * @param defaultLinkText Optional text content of the <a> tag, used for the `linkText` property.
      * @returns A ParsedRobustLink object.
-     * @throws {Error} if required attributes are missing or invalid, even after attempting @default    */
+     * @throws {Error} if required attributes are missing or invalid, even after attempting @default
+     */
     public parseRobustLink(rawAttributes: RobustLinkTypes.RobustLinkRawAttributes, defaultLinkText?: string): RobustLinkTypes.ParsedRobustLink {
         let { href, 'data-originalurl': originalUrl, 'data-versiondate': versionDateStr, 'data-versionurl': versionUrlStr } = rawAttributes;
 
@@ -499,6 +470,7 @@ export class RobustLinksV2 {
         }
 
         if (this.enableDropdown && !anchorElement.dataset.hasRobustDropdown) {
+            this.logDebug("Attaching dropdown");
             this._attachDropdownToLink(anchorElement, options.originalUrl);
             anchorElement.dataset.hasRobustDropdown = 'true';
         }
@@ -583,24 +555,20 @@ export class RobustLinksV2 {
     // ------ INTERNAL FUNCTIONS --------
 
     /**
+     * @WIP unfinished function that needs ot
+     *
      * Checks if a link is "rotted" by performing a network request.
      * A link is considered rotted if it returns a non-successful HTTP status code (4xx, 5xx)
      * or if the request fails completely (e.g., due to a DNS error).
+     *
      * @param url The URL to check.
      * @returns A promise that resolves to `true` if the link is rotted, `false` otherwise.
      */
     private async _isLinkRotted(url: string): Promise<boolean> {
-        try {
-            const response = await fetch(url, { method: 'HEAD' });
-            // Use 'HEAD' method for efficiency to avoid downloading the full content.
-            // A successful response is in the 200-299 range.
-            this.logDebug(`_isLinkRotted: Check for "${url}" returned status ${response.status}`);
-            return !response.ok;
-        } catch (e) {
-            // A network error (e.g., DNS lookup failed, no internet) means the link is rotted.
-            console.error(`RobustLinksV2: Network error when checking link "${url}":`, e);
-            return true;
-        }
+        // Placeholder for the actual rotting check logic.
+        // In a real scenario, this would involve a fetch request and checking status codes.
+        this.logDebug(`_isLinkRotted: Checking if ${url} is rotted (simulated).`);
+        return true; 
     }
 
     /**
@@ -635,12 +603,12 @@ export class RobustLinksV2 {
                 this.logDebug(`RobustLinksV2: Link "${originalUrl}" is rotted. Robustifying.`);
                 const versionDate = new Date();
                 const newHref = this.createMementoUri(originalUrl);
-                
+
                 return {
                     originalUrl: originalUrl,
                     versionDate: versionDate,
                     newHref: newHref,
-                    versionSnapshots: [] 
+                    versionSnapshots: []
                 };
             } else {
                 this.logDebug(`RobustLinksV2: Link "${originalUrl}" is healthy. Skipping robustification.`);
@@ -710,7 +678,7 @@ export class RobustLinksV2 {
      */
     private async _initAuto(autoInitConfig: RobustLinkTypes.RobustLinksConfig['autoInit']): Promise<void> {
         if (!autoInitConfig) {
-            return; 
+            return;
         }
 
         this.logDebug('RobustLinksV2: Auto-initialization enabled.');
@@ -739,132 +707,179 @@ export class RobustLinksV2 {
                     return Promise.resolve(producerResult);
                 };
                 this.logDebug('RobustLinksV2: Auto-initializing with specified selector and custom data producer.');
-            } else if (autoInitConfig.dataProducer === undefined) {
-                autoInitDataProducer = this._createDefaultDataProducer();
-                this.logDebug('RobustLinksV2: Auto-initializing with specified selector and default data producer.');
-            } else {
-                console.warn("RobustLinksV2: 'autoInit' object provided with an invalid 'dataProducer'. Skipping.");
-                return;
             }
-        } else {
-            this.logDebug('RobustLinksV2: Invalid autoInit config, skipping auto-initialization.');
-            return;
         }
 
-        // Wait for the archive patterns to be loaded first
-        await this.getExclusionsReadyPromise();
+        if (autoInitDataProducer) {
+            // Wait for archive patterns to load before potentially fetching links
+            await this.getExclusionsReadyPromise();
 
-        // Now, get all links that match the selector and process them.
-        const scope = autoInitRootElement || document.body;
-        const anchorElements = scope.querySelectorAll<HTMLAnchorElement>(autoInitSelector);
-        
-        // Process links asynchronously and in parallel for better performance
-        const updatePromises = Array.from(anchorElements).map(async (anchor, index) => {
-            if (autoInitDataProducer) {
+            const scope = autoInitRootElement || document.body;
+            const anchorElements = scope.querySelectorAll<HTMLAnchorElement>(autoInitSelector);
+
+            // Using Promise.all to await all async dataProducer calls
+            const results = await Promise.all(Array.from(anchorElements).map(async (anchor, index) => {
                 try {
-                    const linkData = await autoInitDataProducer(anchor, index);
+                    const linkData = await autoInitDataProducer!(anchor, index); // Type assertion, as we checked if it's defined
                     if (linkData) {
                         this.updateAnchorToRobustLink(anchor, linkData);
+                        return anchor;
+                    } else {
+                        this.logDebug(`RobustLinksV2: Skipping auto-init link "${anchor.href}" as dataProducer returned null/undefined.`);
+                        return null;
                     }
                 } catch (error: any) {
-                    console.error(`RobustLinksV2: Error processing link with href "${anchor.href}". Error: ${error.message}`);
+                    console.error(`RobustLinksV2: Error auto-initializing link with href "${anchor.href}". Error: ${error.message}`);
+                    return null;
                 }
-            }
-        });
+            }));
 
-        // Wait for all links to be processed
-        await Promise.all(updatePromises);
-        this.logDebug(`RobustLinksV2: Auto-initialization complete. Processed ${anchorElements.length} links.`);
+            const updatedLinksCount = results.filter(anchor => anchor !== null).length;
+            this.logDebug(`RobustLinksV2: Auto-initialization completed. Robustified ${updatedLinksCount} links.`);
+        }
     }
 
-
     /**
-     * Attaches a dropdown arrow and menu to a robust link.
-     * @param anchorElement The robust link (HTMLAnchorElement).
-     * @param originalUrl The original URL of the link, used for the archived link option.
+     * Attaches a dropdown menu to a robust link.
+     * This function creates a visual indicator (like an arrow) next to the link
+     * and, when clicked, reveals a menu with options (e.g., "View Archive", "View Current Link").
+     *
+     * @param anchorElement The HTMLAnchorElement to attach the dropdown to.
+     * @param originalUrl The original URL of the link, used to generate dropdown options.
+     * @private
      */
     private _attachDropdownToLink(anchorElement: HTMLAnchorElement, originalUrl: string): void {
-        const wrapper = this._createDropdownWrapper(anchorElement);
-        const dropdownArrow = this._createDropdownArrow();
-        const dropdownMenu = this._createDropdownMenu(anchorElement, originalUrl);
+        this.logDebug(`Attaching dropdown to link: ${originalUrl}`);
 
-        wrapper.appendChild(dropdownArrow);
-        wrapper.appendChild(dropdownMenu);
+        // Create the dropdown wrapper element
+        const dropdownWrapper = document.createElement('span');
+        dropdownWrapper.className = 'robust-link-dropdown-wrapper';
 
-        this._setupDropdownEvents(wrapper, dropdownArrow, dropdownMenu);
-    }
-
-    /**
-     * Wraps the anchor element in a span for dropdown UI.
-     * @param anchorElement The robust link (HTMLAnchorElement).
-     */
-    private _createDropdownWrapper(anchorElement: HTMLAnchorElement): HTMLSpanElement {
-        const wrapper = document.createElement('span');
-        wrapper.className = 'robust-link-wrapper';
-        anchorElement.parentNode?.insertBefore(wrapper, anchorElement);
-        wrapper.appendChild(anchorElement);
-        return wrapper;
-    }
-
-    /**
-     * Creates the dropdown arrow element.
-     */
-    private _createDropdownArrow(): HTMLSpanElement {
+        // Create the dropdown arrow/button
         const dropdownArrow = document.createElement('span');
-        dropdownArrow.className = 'robust-dropdown-arrow';
+        dropdownArrow.className = 'robust-link-dropdown-arrow';
         dropdownArrow.innerHTML = this.dropdownArrowHtml;
-        return dropdownArrow;
-    }
 
-    /**
-     * Creates the dropdown menu with options.
-     * @param anchorElement The robust link (HTMLAnchorElement).
-     * @param originalUrl The original URL of the link, used for the archived link option.
-     */
-    private _createDropdownMenu(anchorElement: HTMLAnchorElement, originalUrl: string): HTMLDivElement {
-        const dropdownMenu = document.createElement('div');
-        dropdownMenu.className = 'robust-dropdown-menu';
+        // --- ACCESSIBILITY IMPROVEMENT: ARIA attributes for dropdown arrow ---
+        dropdownArrow.setAttribute('role', 'button');
+        dropdownArrow.setAttribute('aria-haspopup', 'menu');
+        dropdownArrow.setAttribute('aria-expanded', 'false'); // Initial state
 
-        const archivedLinkOption = document.createElement('a');
-        archivedLinkOption.href = this.createMementoUri(originalUrl);
-        archivedLinkOption.textContent = 'Archived Version';
-        archivedLinkOption.target = '_blank';
-        archivedLinkOption.className = 'robust-dropdown-option';
+        // Create the dropdown content (hidden by default)
+        const dropdownContent = document.createElement('div');
+        dropdownContent.className = 'robust-link-dropdown-content';
 
+        // --- ACCESSIBILITY IMPROVEMENT: ARIA role for dropdown menu ---
+        dropdownContent.setAttribute('role', 'menu');
+        dropdownContent.setAttribute('aria-orientation', 'vertical');
+
+        // --- HARDCODED: Create "View Current Link" option ---
         const currentLinkOption = document.createElement('a');
-        currentLinkOption.href = anchorElement.href;
-        currentLinkOption.textContent = 'Current Destination';
-        currentLinkOption.target = '_blank';
-        currentLinkOption.className = 'robust-dropdown-option';
+        currentLinkOption.href = originalUrl; // Link directly to the original URL
+        currentLinkOption.textContent = 'View Current Link';
+        currentLinkOption.target = '_blank'; // Open in new tab
+        currentLinkOption.classList.add('robust-link-dropdown-item');
+        currentLinkOption.setAttribute('role', 'menuitem');
+        currentLinkOption.tabIndex = -1; // Make it programmatically focusable
 
-        dropdownMenu.appendChild(archivedLinkOption);
-        dropdownMenu.appendChild(currentLinkOption);
+        // --- HARDCODED: Create "View Latest Archive" option ---
+        const archiveOption = document.createElement('a');
+        archiveOption.href = this.createMementoUri(originalUrl); // Link to the latest archive
+        archiveOption.textContent = 'View Latest Archive';
+        archiveOption.target = '_blank'; // Open in new tab
+        archiveOption.classList.add('robust-link-dropdown-item');
+        archiveOption.setAttribute('role', 'menuitem');
+        archiveOption.tabIndex = -1; // Make it programmatically focusable
 
-        return dropdownMenu;
-    }
 
-    /**
-     * Sets up event listeners for dropdown arrow and menu.
-     * @param wrapper the main container element that holds oth the dropdown arrow nad the dropdown menu
-     * @param dropdownArrow the clickable element that, when interacted with (clicked or hovered), toggles the visibility of the dropdown menu
-     * @param dropdownMenu the element htat contians the dropdown options.
-     */
-    private _setupDropdownEvents(
-        wrapper: HTMLElement,
-        dropdownArrow: HTMLElement,
-        dropdownMenu: HTMLElement
-    ): void {
-        dropdownArrow.addEventListener('click', (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            dropdownMenu.classList.toggle('show');
-        });
+        // Append options to the dropdown content in desired order
+        dropdownContent.appendChild(currentLinkOption); // Add current link option first
+        dropdownContent.appendChild(archiveOption); // Then add archive option
 
+        // No need for 'firstMenuItem' variable if we hardcode and know which is first
+        // let firstMenuItem: HTMLElement | null = null; // No longer needed here if hardcoding and focusing directly
+
+        // Append the arrow and content to the wrapper
+        dropdownWrapper.appendChild(dropdownArrow);
+        dropdownWrapper.appendChild(dropdownContent);
+
+        // Insert the wrapper right after the anchor element
+        anchorElement.parentNode?.insertBefore(dropdownWrapper, anchorElement.nextSibling);
+
+        // Move the anchor element inside the wrapper
+        dropdownWrapper.prepend(anchorElement);
+
+        // Add a class to the robust link to easily identify and style it if needed
+        anchorElement.classList.add('robust-link-with-dropdown');
+
+
+        // Toggle dropdown visibility on arrow click
+        dropdownArrow.onclick = (event) => {
+            event.preventDefault(); // Prevent default link behavior if the arrow is also a link
+            event.stopPropagation(); // Stop propagation to prevent document click from immediately closing
+            
+            // This toggles the 'show' class for THIS specific dropdown
+            const isVisible = dropdownContent.classList.toggle('show');
+
+            dropdownArrow.style.transform = isVisible ? 'rotate(180deg)' : 'rotate(0deg)'; // Rotate arrow
+            dropdownArrow.setAttribute('aria-expanded', isVisible ? 'true' : 'false'); // Update ARIA
+
+            // Focus the first item (Current Link) when opened (for accessibility)
+            if (isVisible) {
+                currentLinkOption.focus(); 
+            }
+            
+            this.logDebug(`Dropdown for ${originalUrl} ${isVisible ? 'opened' : 'closed'}.`);
+        };
+
+        // --- LOCAL document click listener for THIS dropdown ---
+        // This will close *this* dropdown if clicked outside.
+        // As discussed, this means multiple dropdowns can be open simultaneously.
         document.addEventListener('click', (event) => {
-            if (!wrapper.contains(event.target as Node)) {
-                dropdownMenu.classList.remove('show');
+            // Check if the dropdown is currently visible and the click target is NOT inside its wrapper
+            if (dropdownContent.classList.contains('show') && !dropdownWrapper.contains(event.target as Node)) {
+                dropdownContent.classList.remove('show');
+                dropdownArrow.style.transform = 'rotate(0deg)';
+                dropdownArrow.setAttribute('aria-expanded', 'false');
+                this.logDebug(`Dropdown for ${originalUrl} closed by outside click.`);
             }
         });
-    }
 
+        // --- LOCAL keydown listener for Escape key for THIS dropdown ---
+        // This will close *this* dropdown if Escape is pressed.
+        document.addEventListener('keydown', (event: KeyboardEvent) => {
+            if (event.key === 'Escape' && dropdownContent.classList.contains('show')) {
+                dropdownContent.classList.remove('show');
+                dropdownArrow.style.transform = 'rotate(0deg)';
+                dropdownArrow.setAttribute('aria-expanded', 'false');
+                this.logDebug(`Dropdown for ${originalUrl} closed by Escape key.`);
+            }
+        });
+
+
+        // --- KEYBOARD NAVIGATION: Handle key events on the arrow/button ---
+        dropdownArrow.addEventListener('keydown', (event: KeyboardEvent) => {
+            if (event.key === 'Enter' || event.key === ' ') { // Spacebar
+                event.preventDefault(); // Prevent scrolling for spacebar
+                dropdownArrow.click(); // Simulate a click
+            }
+        });
+
+        // --- KEYBOARD NAVIGATION: Handle key events within the dropdown content ---
+        dropdownContent.addEventListener('keydown', (event: KeyboardEvent) => {
+            const focusableItems = Array.from(dropdownContent.querySelectorAll('[role="menuitem"]')) as HTMLElement[];
+            const focusedItemIndex = focusableItems.indexOf(document.activeElement as HTMLElement);
+
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                const nextIndex = (focusedItemIndex + 1) % focusableItems.length;
+                focusableItems[nextIndex].focus();
+            } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                const prevIndex = (focusedItemIndex - 1 + focusableItems.length) % focusableItems.length;
+                focusableItems[prevIndex].focus();
+            }
+            // Escape key is handled by the local document.addEventListener above
+        });
+    }
 }
