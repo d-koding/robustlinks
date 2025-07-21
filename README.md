@@ -7,6 +7,25 @@ This library helps ensure that even if an original web resource changes or disap
 ![](https://robustlinks.mementoweb.org/demo/robustlinks_demo_light.gif)
 *(Note: The GIF shows a previous version's UI, but the core concept of augmented links remains.)*
 
+### See it in Action!
+
+<a href="/dist/index.html" style="
+    display: inline-block;
+    padding: 10px 20px;
+    font-size: 16px;
+    font-weight: bold;
+    color: #ffffff;
+    background-color: #007bff;
+    border: none;
+    border-radius: 5px;
+    text-decoration: none;
+    text-align: center;
+    transition: background-color 0.3s;
+">
+    Go to the Live Demo
+</a>
+
+
 ## Key Concepts
 
 Robust Links enhance standard `<a>` tags with specific `data-*` attributes:
