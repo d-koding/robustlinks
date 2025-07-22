@@ -907,9 +907,6 @@ export class RobustLinksV2 {
             dropdownArrow.style.transform = isVisible ? 'rotate(180deg)' : 'rotate(0deg)';
             dropdownArrow.setAttribute('aria-expanded', isVisible ? 'true' : 'false');
 
-            if (isVisible) {
-                currentLinkOption.focus(); 
-            }
             this.logDebug(`Dropdown for ${originalUrl} ${isVisible ? 'opened' : 'closed'}.`);
         };
 
