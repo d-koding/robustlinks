@@ -1,5 +1,31 @@
-import * as RobustLinkTypes from './robustlinks.types'; // Assuming you have this type definition file
+import * as RobustLinkTypes from './robustlinks.types'; 
 
+/** robustlinks2.ts
+ *
+ * @overview A general purpose library for handling Robust Link data.
+ * Provides tools necessary for creating, augmenting, and parsing Robust
+ * Links.
+ *
+ * Currently assumes another client will handle specific data fetching
+ * methods for TimeGates and TimeMaps.
+ *
+ * @author Yorick Chollet <yorick.chollet@gmail.com>
+ * @author Harihar Shankar <hariharshankar@gmail.com>
+ * @author Shawn M. Jones <jones.shawn.m@gmail.com>
+ * @author Dylan O'Connor <dylankconnor@gmail.com>
+ * @version 3.0.0
+ * License can be obtained at http://mementoweb.github.io/SiteStory/license.html
+ *
+*/
+/**
+ * The `RobustLinksV2` class provides functionality for managing and configuring
+ * robust linking behavior within an application. It includes utilities for
+ * validating URLs, managing a list of excluded archive patterns, and parsing
+ * and creating Robust Links based on the specification.
+ *
+ * It can be used as a module to be initialized once and then used throughout
+ * your application to manage robust links.
+ */
 export class RobustLinksV2 {
     // Internal constants for the module -> Not in the constructor because we want to guarantee imutability
     private readonly NAME: string = 'RobustLinksV2';
@@ -106,7 +132,7 @@ export class RobustLinksV2 {
          *
          * @type {string}
          */
-        this.dropdownArrowSize = config.dropdownArrowSize || '6px';
+        this.dropdownArrowSize = config.dropdownArrowSize || '12px';
 
         /**
          * Initializes a custom dropdown arrow, based on string html
@@ -741,8 +767,8 @@ export class RobustLinksV2 {
 
     /**
      * Attaches a dropdown menu to a robust link.
-     * This function creates a visual indicator (like an arrow) next to the link
-     * and, when clicked, reveals a menu with options (e.g., "View Archive", "View Current Link").
+     * This function orchestrates the creation of dropdown elements,
+     * adding options, inserting them into the DOM, and setting up event listeners.
      *
      * @param anchorElement The HTMLAnchorElement to attach the dropdown to.
      * @param originalUrl The original URL of the link, used to generate dropdown options.
@@ -751,55 +777,103 @@ export class RobustLinksV2 {
     private _attachDropdownToLink(anchorElement: HTMLAnchorElement, originalUrl: string): void {
         this.logDebug(`Attaching dropdown to link: ${originalUrl}`);
 
-        // Create the dropdown wrapper element
+        const { dropdownWrapper, dropdownArrow, dropdownContent } = this._createDropdownElements();
+        const { currentLinkOption, archiveOption } = this._addDropdownOptions(dropdownContent, originalUrl);
+        
+        this._insertDropdownIntoDOM(anchorElement, dropdownWrapper, dropdownArrow, dropdownContent);
+
+        this._setupDropdownEventListeners(
+            dropdownArrow,
+            dropdownContent,
+            currentLinkOption,
+            originalUrl
+        );
+
+        // Add a class to the robust link to easily identify and style it if needed
+        anchorElement.classList.add('robust-link-with-dropdown');
+    }
+
+    /**
+     * Creates the core HTML elements for the dropdown: wrapper, arrow, and content.
+     * @private
+     * @returns An object containing the created HTMLElement references.
+     */
+    private _createDropdownElements(): {
+        dropdownWrapper: HTMLSpanElement;
+        dropdownArrow: HTMLSpanElement;
+        dropdownContent: HTMLDivElement;
+    } {
+        // In _createDropdownElements
+        const dropdownArrow = document.createElement('span');
+        dropdownArrow.className = 'robust-link-dropdown-arrow';
+        
+        dropdownArrow.innerHTML = this.dropdownArrowHtml;
+        dropdownArrow.style.color = this.dropdownArrowColor;
+        dropdownArrow.style.fontSize = this.dropdownArrowSize;
         const dropdownWrapper = document.createElement('span');
         dropdownWrapper.className = 'robust-link-dropdown-wrapper';
 
-        // Create the dropdown arrow/button
-        const dropdownArrow = document.createElement('span');
         dropdownArrow.className = 'robust-link-dropdown-arrow';
         dropdownArrow.innerHTML = this.dropdownArrowHtml;
-
-        // --- ACCESSIBILITY IMPROVEMENT: ARIA attributes for dropdown arrow ---
         dropdownArrow.setAttribute('role', 'button');
         dropdownArrow.setAttribute('aria-haspopup', 'menu');
-        dropdownArrow.setAttribute('aria-expanded', 'false'); // Initial state
+        dropdownArrow.setAttribute('aria-expanded', 'false');
 
-        // Create the dropdown content (hidden by default)
         const dropdownContent = document.createElement('div');
         dropdownContent.className = 'robust-link-dropdown-content';
-
-        // --- ACCESSIBILITY IMPROVEMENT: ARIA role for dropdown menu ---
         dropdownContent.setAttribute('role', 'menu');
         dropdownContent.setAttribute('aria-orientation', 'vertical');
 
-        // --- HARDCODED: Create "View Current Link" option ---
+        return { dropdownWrapper, dropdownArrow, dropdownContent };
+    }
+
+    /**
+     * Creates and appends the "View Current Link" and "View Latest Archive" options to the dropdown content.
+     * @param dropdownContent The HTMLDivElement representing the dropdown's content area.
+     * @param originalUrl The original URL to be used for the options.
+     * @private
+     * @returns An object containing references to the created option elements.
+     */
+    private _addDropdownOptions(dropdownContent: HTMLDivElement, originalUrl: string): {
+        currentLinkOption: HTMLAnchorElement;
+        archiveOption: HTMLAnchorElement;
+    } {
         const currentLinkOption = document.createElement('a');
-        currentLinkOption.href = originalUrl; // Link directly to the original URL
+        currentLinkOption.href = originalUrl;
         currentLinkOption.textContent = 'View Current Link';
-        currentLinkOption.target = '_blank'; // Open in new tab
+        currentLinkOption.target = '_blank';
         currentLinkOption.classList.add('robust-link-dropdown-item');
         currentLinkOption.setAttribute('role', 'menuitem');
-        currentLinkOption.tabIndex = -1; // Make it programmatically focusable
+        currentLinkOption.tabIndex = -1;
 
-        // --- HARDCODED: Create "View Latest Archive" option ---
         const archiveOption = document.createElement('a');
-        archiveOption.href = this.createMementoUri(originalUrl); // Link to the latest archive
+        archiveOption.href = this.createMementoUri(originalUrl);
         archiveOption.textContent = 'View Latest Archive';
-        archiveOption.target = '_blank'; // Open in new tab
+        archiveOption.target = '_blank';
         archiveOption.classList.add('robust-link-dropdown-item');
         archiveOption.setAttribute('role', 'menuitem');
-        archiveOption.tabIndex = -1; // Make it programmatically focusable
+        archiveOption.tabIndex = -1;
 
+        dropdownContent.appendChild(currentLinkOption);
+        dropdownContent.appendChild(archiveOption);
 
-        // Append options to the dropdown content in desired order
-        dropdownContent.appendChild(currentLinkOption); // Add current link option first
-        dropdownContent.appendChild(archiveOption); // Then add archive option
+        return { currentLinkOption, archiveOption };
+    }
 
-        // No need for 'firstMenuItem' variable if we hardcode and know which is first
-        // let firstMenuItem: HTMLElement | null = null; // No longer needed here if hardcoding and focusing directly
-
-        // Append the arrow and content to the wrapper
+    /**
+     * Inserts the created dropdown elements into the DOM relative to the anchor element.
+     * @param anchorElement The original anchor element.
+     * @param dropdownWrapper The main wrapper for the dropdown.
+     * @param dropdownArrow The dropdown arrow element.
+     * @param dropdownContent The dropdown content element.
+     * @private
+     */
+    private _insertDropdownIntoDOM(
+        anchorElement: HTMLAnchorElement,
+        dropdownWrapper: HTMLSpanElement,
+        dropdownArrow: HTMLSpanElement,
+        dropdownContent: HTMLDivElement
+    ): void {
         dropdownWrapper.appendChild(dropdownArrow);
         dropdownWrapper.appendChild(dropdownContent);
 
@@ -808,36 +882,41 @@ export class RobustLinksV2 {
 
         // Move the anchor element inside the wrapper
         dropdownWrapper.prepend(anchorElement);
+    }
 
-        // Add a class to the robust link to easily identify and style it if needed
-        anchorElement.classList.add('robust-link-with-dropdown');
-
-
+    /**
+     * Sets up all necessary event listeners for the dropdown's functionality.
+     * @param dropdownArrow The arrow element that toggles the dropdown.
+     * @param dropdownContent The content area of the dropdown.
+     * @param currentLinkOption The "View Current Link" option (for initial focus).
+     * @param originalUrl The original URL for logging purposes.
+     * @private
+     */
+    private _setupDropdownEventListeners(
+        dropdownArrow: HTMLSpanElement,
+        dropdownContent: HTMLDivElement,
+        currentLinkOption: HTMLAnchorElement,
+        originalUrl: string
+    ): void {
         // Toggle dropdown visibility on arrow click
         dropdownArrow.onclick = (event) => {
-            event.preventDefault(); // Prevent default link behavior if the arrow is also a link
-            event.stopPropagation(); // Stop propagation to prevent document click from immediately closing
+            event.preventDefault();
+            event.stopPropagation();
             
-            // This toggles the 'show' class for THIS specific dropdown
             const isVisible = dropdownContent.classList.toggle('show');
+            dropdownArrow.style.transform = isVisible ? 'rotate(180deg)' : 'rotate(0deg)';
+            dropdownArrow.setAttribute('aria-expanded', isVisible ? 'true' : 'false');
 
-            dropdownArrow.style.transform = isVisible ? 'rotate(180deg)' : 'rotate(0deg)'; // Rotate arrow
-            dropdownArrow.setAttribute('aria-expanded', isVisible ? 'true' : 'false'); // Update ARIA
-
-            // Focus the first item (Current Link) when opened (for accessibility)
             if (isVisible) {
                 currentLinkOption.focus(); 
             }
-            
             this.logDebug(`Dropdown for ${originalUrl} ${isVisible ? 'opened' : 'closed'}.`);
         };
 
-        // --- LOCAL document click listener for THIS dropdown ---
-        // This will close *this* dropdown if clicked outside.
-        // As discussed, this means multiple dropdowns can be open simultaneously.
+        // Local document click listener for THIS dropdown (closes if clicked outside)
         document.addEventListener('click', (event) => {
-            // Check if the dropdown is currently visible and the click target is NOT inside its wrapper
-            if (dropdownContent.classList.contains('show') && !dropdownWrapper.contains(event.target as Node)) {
+            const dropdownWrapper = dropdownArrow.closest('.robust-link-dropdown-wrapper'); // Get wrapper via ancestor
+            if (dropdownContent.classList.contains('show') && dropdownWrapper && !dropdownWrapper.contains(event.target as Node)) {
                 dropdownContent.classList.remove('show');
                 dropdownArrow.style.transform = 'rotate(0deg)';
                 dropdownArrow.setAttribute('aria-expanded', 'false');
@@ -845,41 +924,61 @@ export class RobustLinksV2 {
             }
         });
 
-        // --- LOCAL keydown listener for Escape key for THIS dropdown ---
-        // This will close *this* dropdown if Escape is pressed.
+        // Local keydown listener for Escape key for THIS dropdown
         document.addEventListener('keydown', (event: KeyboardEvent) => {
             if (event.key === 'Escape' && dropdownContent.classList.contains('show')) {
                 dropdownContent.classList.remove('show');
                 dropdownArrow.style.transform = 'rotate(0deg)';
                 dropdownArrow.setAttribute('aria-expanded', 'false');
                 this.logDebug(`Dropdown for ${originalUrl} closed by Escape key.`);
+                dropdownArrow.focus(); // Return focus to the arrow button
             }
         });
 
-
-        // --- KEYBOARD NAVIGATION: Handle key events on the arrow/button ---
+        // Keyboard navigation for arrow button
         dropdownArrow.addEventListener('keydown', (event: KeyboardEvent) => {
-            if (event.key === 'Enter' || event.key === ' ') { // Spacebar
-                event.preventDefault(); // Prevent scrolling for spacebar
-                dropdownArrow.click(); // Simulate a click
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                dropdownArrow.click();
             }
         });
 
-        // --- KEYBOARD NAVIGATION: Handle key events within the dropdown content ---
+        // Keyboard navigation within the dropdown content
         dropdownContent.addEventListener('keydown', (event: KeyboardEvent) => {
             const focusableItems = Array.from(dropdownContent.querySelectorAll('[role="menuitem"]')) as HTMLElement[];
-            const focusedItemIndex = focusableItems.indexOf(document.activeElement as HTMLElement);
+            const focusedItem = document.activeElement as HTMLElement;
+            let newFocusedItem: HTMLElement | null = null;
 
-            if (event.key === 'ArrowDown') {
-                event.preventDefault();
-                const nextIndex = (focusedItemIndex + 1) % focusableItems.length;
-                focusableItems[nextIndex].focus();
-            } else if (event.key === 'ArrowUp') {
-                event.preventDefault();
-                const prevIndex = (focusedItemIndex - 1 + focusableItems.length) % focusableItems.length;
-                focusableItems[prevIndex].focus();
+            if (focusableItems.length === 0) return;
+
+            let focusedItemIndex = focusableItems.indexOf(focusedItem);
+
+            // Handle initial focus or out-of-bounds focus for ArrowDown/Up
+            if (focusedItemIndex === -1 || !dropdownContent.contains(focusedItem)) {
+                if (event.key === 'ArrowDown') {
+                    newFocusedItem = focusableItems[0];
+                    event.preventDefault();
+                } else if (event.key === 'ArrowUp') {
+                    newFocusedItem = focusableItems[focusableItems.length - 1];
+                    event.preventDefault();
+                }
+            } else {
+                if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    const nextIndex = (focusedItemIndex + 1) % focusableItems.length;
+                    newFocusedItem = focusableItems[nextIndex];
+                } else if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    const prevIndex = (focusedItemIndex - 1 + focusableItems.length) % focusableItems.length;
+                    newFocusedItem = focusableItems[prevIndex];
+                }
             }
-            // Escape key is handled by the local document.addEventListener above
+            
+            if (newFocusedItem) {
+                // --- CRITICAL CHANGE: ONLY focus the new item. Remove class manipulation. ---
+                newFocusedItem.focus(); // This transfers browser focus
+                this.logDebug(`[Dropdown Keydown]: Focused:`, newFocusedItem);
+            }
         });
     }
 }
