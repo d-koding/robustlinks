@@ -192,7 +192,7 @@ build/
 *.lo
 *.o
 *.d
-*.js
+#*.js
 *.map
 *.swiftdoc
 *.swiftmodule
