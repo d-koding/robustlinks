@@ -3,249 +3,111 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RobustLinksV2 Showcase</title>
-    <link rel="stylesheet">
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            margin: 20px;
-            color: #333;
-        }
-        h1, h2, h3 {
-            color: #0056b3;
-        }
-        .container {
-            max-width: 900px;
-            margin: auto;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .section {
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 1px dashed #eee;
-        }
-        .section:last-child {
-            border-bottom: none;
-        }
-        pre {
-            background-color: #f4f4f4;
-            padding: 15px;
-            border-radius: 5px;
-            overflow-x: auto;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
-        code {
-            font-family: "Courier New", Courier, monospace;
-            color: #d14;
-        }
-        .robust-link-wrapper {
-            display: inline-flex; /* Use flexbox to align anchor and arrow */
-            align-items: center; /* Vertically align items */
-            margin-right: 10px; /* Space between links */
-            position: relative; /* For dropdown positioning */
-        }
-        .robust-dropdown-arrow {
-            margin-left: 4px;
-            cursor: pointer;
-            user-select: none; /* Prevent text selection on arrow */
-        }
-        .robust-dropdown-menu {
-            display: none;
-            position: absolute;
-            background-color: #f9f9f9;
-            min-width: 160px;
-            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
-            z-index: 1000;
-            padding: 8px 0;
-            border-radius: 4px;
-            top: 100%; /* Position below the wrapper */
-            left: 0;
-        }
-        .robust-dropdown-menu a {
-            color: black;
-            padding: 8px 16px;
-            text-decoration: none;
-            display: block;
-        }
-        .robust-dropdown-menu a:hover {
-            background-color: #f1f1f1;
-        }
-        .output {
-            background-color: #e9f7ef;
-            border-left: 5px solid #28a745;
-            padding: 10px;
-            margin-top: 15px;
-            border-radius: 4px;
-        }
-        .warning {
-            background-color: #fff3cd;
-            border-left: 5px solid #ffc107;
-            padding: 10px;
-            margin-top: 15px;
-            border-radius: 4px;
-        }
-    </style>
+    <title>Robust Links V2 Demo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Placeholder integrity attribute. In a real project, use the actual one from Font Awesome. -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" 
+      integrity="sha512-Fo3rlrZj/k7ujTnHg4CGR2D7kSs0v4LLanw2qksYuRlEzO+tcaEPQogQ0KaoGN26/zrn20ImR1DfuLWnOo7aBA==" 
+      crossorigin="anonymous" 
+      referrerpolicy="no-referrer" />
+    
+    <link rel="stylesheet" href="robustlinks.css"> 
 </head>
-<body>
-
+<body class="bg-gray-100 p-4">
     <div class="container">
-        <h1>RobustLinksV2 Class Showcase</h1>
-        <p>This page demonstrates the various functionalities of the <code>RobustLinksV2</code> class.</p>
+        <h1 class="text-4xl font-bold mb-6">Robust Links V2 Demo</h1>
+        <p class="text-lg text-gray-700 mb-8 text-center">
+            This page demonstrates the functionality of the <code>RobustLinksV2</code> class,
+            specifically using the <code>makeAllLinksRobust</code> method to transform links.
+        </p>
 
-        ---
+        <h2 class="section-title">Links to be Robustified via <code>makeAllLinksRobust()</code></h2>
+        <p>These links will be explicitly targeted by the <code>makeAllLinksRobust()</code> method and transformed into robust links with dropdowns. The `data-rotted` attribute is used by the `dataProducer` function to decide which links get a simulated Memento URI.</p>
+        <ul class="link-list">
+            <li>
+                <a href="https://example.com/plain-link-1" class="data-robustify">A Plain Link (will become robust)</a>
+                <p class="text-sm text-gray-500 ml-4"><em>(Will be robustified to a Memento URI and get a dropdown)</em></p>
+            </li>
+            <li>
+                <a href="https://example.com/another-plain-link-2" class="data-robustify">Another Plain Link (will become robust)</a>
+                <p class="text-sm text-gray-500 ml-4"><em>(Will be robustified to a Memento URI and get a dropdown)</em></p>
+            </li>
+            <li>
+                <a href="https://example.com/rotted-link-3" class="data-robustify" data-rotted="true">Simulated Rotted Link</a>
+                <p class="text-sm text-gray-500 ml-4"><em>(Will be robustified to a Memento URI and get a dropdown)</em></p>
+            </li>
+            <li>
+                <a href="https://example.com/custom-date-link" class="data-robustify" data-versiondate-override="2022-03-15T10:00:00Z">Link with Custom Archive Date</a>
+                <p class="text-sm text-gray-500 ml-4"><em>(Will be robustified using a specific `versionDate` and get a dropdown)</em></p>
+            </li>
+            <li>
+                <a href="https://www.google.com" class="data-robustify">Google</a>
+                <p class="text-sm text-gray-500 ml-4"><em>(Will be robustified to a Memento URI and get a dropdown)</em></p>
+            </li>
+            <li>
+                <a href="https://www.wikipedia.org" class="data-robustify">Wikipedia</a>
+                <p class="text-sm text-gray-500 ml-4"><em>(Will be robustified to a Memento URI and get a dropdown)</em></p>
+            </li>
+        </ul>
 
-        <div class="section">
-            <h2>1. Automatic Robust Link Creation (<code></code>)</h2>
-            <p>
-                The <code>RobustLinksV2</code> class can automatically convert plain links into robust links upon initialization.
-                By default, it targets <code>a:not([data-originalurl])</code> elements.
-                This section shows links that will be robustified using the default data producer logic.
-            </p>
-            <p>
-                <a href="https://example.com/page1">Original Link 1 (Will be Robustified)</a> <br>
-                <a href="https://www.google.com/">Google (Will be Robustified)</a> <br>
-                <a href="https://en.wikipedia.org/">Wikipedia (Will be Robustified)</a>
-            </p>
-            <div class="output">
-                <strong>Expected:</strong> The links above will gain <code>data-originalurl</code> and <code>data-versiondate</code> attributes, and potentially a dropdown arrow. Check developer tools to confirm.
-            </div>
-        </div>
+        <h2 class="section-title">Links NOT processed by <code>makeAllLinksRobust()</code></h2>
+        <p>These links will remain as they are, demonstrating that only explicitly targeted links are affected.</p>
+        <ul class="link-list">
+            <li><a href="https://example.com/unaffected-link">An Unaffected Link</a></li>
+            <li><a href="https://web.archive.org/20200515103000/https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404">An Existing Memento URI (unaffected)</a></li>
+            <li><a href="https://perma.cc/AB12-CDEF">An Existing Perma.cc Link (unaffected)</a></li>
+        </ul>
 
-        ---
 
-        <div class="section">
-            <h2>3. Creating Memento URIs (<code>createMementoUri</code>)</h2>
-            <p>
-                This demonstrates the creation of Memento URIs (URI-M or URI-G) using the <code>createMementoUri</code> method.
-            </p>
-            <ul>
-                <li id="mementoUriTimeGate"><strong>TimeGate URI (latest):</strong> For <code>https://www.iana.org/</code></li>
-                <li id="mementoUriSpecific"><strong>Memento URI (specific date):</strong> For <code>https://www.iana.org/domains/example</code> on <code>2020-05-15</code></li>
-            </ul>
-        </div>
-
-        ---
-
-        <div class="section">
-            <h2>4. Dropdown Functionality & Customization</h2>
-            <p>
-                Robust Links can be configured to display a dropdown arrow, providing options like viewing
-                the original (archived) page.
-            </p>
-            <p>
-                The links in section 1 and 3 will have dropdowns because <code>enableDropdown</code> is set to <code>true</code>
-                and a custom <code>dropdownArrowColor</code> and <code>dropdownArrowSize</code> are applied in the initialization.
-            </p>
-            <div class="output">
-                <strong>Check:</strong> Hover over the robustified links in "Automatic Robust Link Creation" and "Manual Robust Link Update" sections. You should see a dropdown arrow, and clicking it should reveal options.
-            </div>
-        </div>
-
-        ---
-
-        <div class="section">
-            <h2>5. Checking for Archive URLs (<code>isArchiveUrl</code>)</h2>
-            <p>
-                The <code>isArchiveUrl</code> method checks if a given URL matches known archive patterns.
-            </p>
-            <ul>
-                <li><code>https://web.archive.org/web/20230101000000/http://example.com/</code>: <span id="isArchive1"></span></li>
-                <li><code>https://example.com/regular-page</code>: <span id="isArchive2"></span></li>
-            </ul>
-        </div>
-
-        ---
-
+        <h2 class="section-title">Console Output</h2>
+        <p>Open your browser's developer console (F12) to see debug messages from the <code>RobustLinksV2</code> class.</p>
     </div>
 
     <script type="module">
-        import { RobustLinksV2,  } from './robustlinks2.js';
+        // Import the RobustLinksV2 class from your compiled JS file
+        import { RobustLinksV2 } from './robustlinks2.js'; 
 
-        // --- 1. Automatic Robust Link Creation (autoInit: true) ---
-        // Initialize RobustLinksV2 with default autoInit (true) and dropdowns enabled
-        // This instance will robustify all 'a:not([data-originalurl])' links
-        const rlDefaultAutoInit = new RobustLinksV2({
-            
-        });
+        // Initialize RobustLinksV2 on window load or DOMContentLoaded
+        window.onload = async () => {
+            console.log("Page loaded. Initializing RobustLinksV2...");
 
+            // Create an instance of the RobustLinksV2 class
+            const robustLinks = new RobustLinksV2({
+                debug: true, // Enable debug logging
+                enableDropdown: true, // Enable the dropdown feature
+                dropdownArrowHtml: '<i class="fas fa-chevron-down"></i>', // Font Awesome down arrow
+            });
 
-        // --- 3. Manual Robust Link Update (updateAnchorToRobustLink) ---
-        const robustifyButton = document.getElementById('robustifyButton');
-        const manualLink = document.getElementById('manualLink');
-        const manualLinkOutput = document.getElementById('manualLinkOutput');
+            // --- Use makeAllLinksRobust to process specific links ---
+            robustLinks.makeAllLinksRobust(
+                'a.data-robustify', // Selector for links to robustify
+                (anchorElement, index) => {
+                    const originalUrl = anchorElement.href;
+                    let versionDate = new Date(); // Default to current date
 
-        robustifyButton.addEventListener('click', () => {
-            if (manualLink) {
-                const originalUrl = "https://www.example.com/important-document";
-                const versionDate = new Date('2024-03-20T12:00:00Z');
-                const newHref = rlDefaultAutoInit.createMementoUri(originalUrl, versionDate);
+                    // Allow overriding versionDate for specific test cases
+                    if (anchorElement.dataset.versiondateOverride) {
+                        const parsedDate = new Date(anchorElement.dataset.versiondateOverride);
+                        if (!isNaN(parsedDate.getTime())) {
+                            versionDate = parsedDate;
+                        }
+                    }
 
-                try {
-                    rlDefaultAutoInit.updateAnchorToRobustLink(manualLink, {
+                    // Simulate a "rotted" link by always creating a Memento URI
+                    // For a real scenario, you'd check if the link is actually rotted here.
+                    const newHref = robustLinks.createMementoUri(originalUrl, versionDate);
+
+                    return {
                         originalUrl: originalUrl,
                         versionDate: versionDate,
-                        versionSnapshots: [
-                            { uri: "https://snapshot1.com/doc", datetime: "20240320120000" },
-                            { uri: "https://snapshot2.org/doc" } // Snapshot without datetime
-                        ],
                         newHref: newHref
-                    });
-                    manualLinkOutput.innerHTML = `Link robustified! Check its attributes. New href: <a href="${newHref}" target="_blank">${newHref}</a>`;
-                } catch (error) {
-                    manualLinkOutput.innerHTML = `<div class="warning">Error robustifying link: ${error.message}</div>`;
-                    console.error("Error robustifying manual link:", error);
+                    };
                 }
-            }
-        });
+            );
 
-
-        // --- 4. Parsing Existing Robust Links (findAndParseRobustLinks) ---
-        const parseLinksButton = document.getElementById('parseLinksButton');
-        const parsedLinksOutput = document.getElementById('parsedLinksOutput');
-
-        parseLinksButton.addEventListener('click', () => {
-            const parsedLinks = rlDefaultAutoInit.findAndParseRobustLinks(document.querySelector('.section:nth-of-type(4)')); // Limit search to this section
-            parsedLinksOutput.textContent = JSON.stringify(parsedLinks, null, 2);
-        });
-
-
-        // --- 5. Creating Memento URIs (createMementoUri) ---
-        const mementoUriTimeGate = document.getElementById('mementoUriTimeGate');
-        const mementoUriSpecific = document.getElementById('mementoUriSpecific');
-
-        // TimeGate URI (latest)
-        const latestMemento = rlDefaultAutoInit.createMementoUri("https://www.iana.org/");
-        mementoUriTimeGate.innerHTML += ` <a href="${latestMemento}" target="_blank">${latestMemento}</a>`;
-
-        // Memento URI (specific date)
-        const specificDate = new Date('2222-05-15T00:00:00Z'); // Using a future date for demonstration
-        const specificMemento = rlDefaultAutoInit.createMementoUri("https://www.iana.org/domains/example", specificDate);
-        mementoUriSpecific.innerHTML += ` <a href="${specificMemento}" target="_blank">${specificMemento}</a>`;
-
-
-        // --- 7. Checking for Archive URLs (isArchiveUrl) ---
-        const isArchive1 = document.getElementById('isArchive1');
-        const isArchive2 = document.getElementById('isArchive2');
-
-        isArchive1.textContent = rlDefaultAutoInit.isArchiveUrl('https://web.archive.org/web/20230101000000/http://example.com/');
-        isArchive2.textContent = rlDefaultAutoInit.isArchiveUrl('https://example.com/regular-page');
-
-
-        // --- 8. Static Utility Methods ---
-        document.getElementById('parsedDate1').textContent = RobustLinksV2.parseDatetime('2023-04-20T10:00:00Z')?.toISOString() || 'Invalid';
-        document.getElementById('parsedDate2').textContent = RobustLinksV2.parseDatetime('20230420100000')?.toISOString() || 'Invalid';
-        document.getElementById('parsedDate3').textContent = RobustLinksV2.parseDatetime('2023-04-20')?.toISOString() || 'Invalid';
-        document.getElementById('parsedDate4').textContent = RobustLinksV2.parseDatetime('20230420')?.toISOString() || 'Invalid';
-        document.getElementById('parsedDate5').textContent = RobustLinksV2.parseDatetime('invalid-date')?.toISOString() || 'Invalid';
-
-        document.getElementById('parsedVersionUrl1').textContent = JSON.stringify(RobustLinksV2.parseVersionUrl('https://snap.com/a 20230101 https://snap.com/b'), null, 2);
-        document.getElementById('parsedVersionUrl2').textContent = JSON.stringify(RobustLinksV2.parseVersionUrl('https://snap.com/c'), null, 2);
-
+            console.log("RobustLinksV2 initialized and links processed using makeAllLinksRobust. Check console for debug messages and interact with links.");
+        };
     </script>
 </body>
 </html>
