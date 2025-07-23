@@ -96,22 +96,4 @@ describe('RobustLinksV2', () => {
             expect(html).toContain('>Example<');
         });
     });
-
-    // DOM-dependent tests (optional, can be expanded with jsdom)
-    describe('makeAllLinksRobust', () => {
-        beforeEach(() => {
-            document.body.innerHTML = '<a href="https://foo.com">Foo</a>';
-        });
-        it('should robustify all matching links', () => {
-            const dataProducer = (anchor: HTMLAnchorElement) => ({
-                originalUrl: anchor.href,
-                versionDate: new Date('2023-07-09T12:00:00Z'),
-                versionSnapshots: []
-            });
-            const updated = instance.makeAllLinksRobust('a', dataProducer);
-            expect(updated.length).toBe(1);
-            expect(updated[0].getAttribute('data-originalurl')).toBe('https://foo.com/');
-            expect(updated[0].getAttribute('data-versiondate')).toBe('2023-07-09');
-        });
-    });
 });

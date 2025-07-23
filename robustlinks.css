@@ -116,22 +116,21 @@ a:hover {
     transform: translateY(0);
 }
 
-/* Dropdown Options (links inside the content) */
+/* Dropdown Options */
 .robust-link-dropdown-item {
-    color: #34495e; /* Default text color for dropdown items */
+    color: #34495e; 
     padding: 10px 16px;
     text-decoration: none;
     display: block;
     font-size: 0.95rem;
-    /* Transition for both background and color on hover */
     transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
     z-index: 101;
 }
 
-/* Mouse Hover: ONLY apply gray background and darker text */
+/* Mouse Hover */
 .robust-link-dropdown-item:hover {
-    background-color: #a9a9a9; /* Gray highlight on hover */
-    color: #2c3e50; /* Darker text color on hover */
+    background-color: #a9a9a9; 
+    color: #2c3e50; 
 }
 
 
