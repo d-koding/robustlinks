@@ -185,11 +185,10 @@ export class RobustLinksV2 {
     static isValidAbsoluteUrl(url) {
         try {
             const parsedUrl = new URL(url);
-            // Ensure it's http or https protocol and has a non-empty hostname
-            return (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') && parsedUrl.hostname.length > 0;
+            return (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') &&
+                parsedUrl.hostname.length > 0;
         }
         catch (e) {
-            // If URL constructor throws an error, it's not a valid URL
             return false;
         }
     }
@@ -227,7 +226,7 @@ export class RobustLinksV2 {
         if (waDatetimeMatch) {
             return new Date(Date.UTC(parseInt(waDatetimeMatch[1]), parseInt(waDatetimeMatch[2]) - 1, parseInt(waDatetimeMatch[3]), parseInt(waDatetimeMatch[4]), parseInt(waDatetimeMatch[5]), parseInt(waDatetimeMatch[6])));
         }
-        return null; // Invalid format
+        return null;
     }
     /**
      * Parses the data-versionurl string into an array of RobustLinkSnapshot objects.
@@ -459,24 +458,45 @@ export class RobustLinksV2 {
      * @param rootElement The HTML element to search within. @default `document.body`.
      * @returns An array of HTMLAnchorElement that were successfully made robust.
      */
-    makeAllLinksRobust(selector, dataProducer, rootElement) {
+    async makeAllLinksRobust(selector, dataProducer, // The null/undefined allows for an explicitly synchronous producer too, but the Promise handles async
+    rootElement) {
         this.logDebug(`RobustLinksV2: Attempting to make all links matching selector "${selector}" robust.`);
         const updatedLinks = [];
         const scope = rootElement || document.body;
         const anchorElements = scope.querySelectorAll(selector);
-        anchorElements.forEach((anchor, index) => {
+        await this.getExclusionsReadyPromise();
+        if (!dataProducer) {
+            dataProducer = this._createDefaultDataProducer();
+        }
+        // Use Promise.allSettled to handle all async operations concurrently
+        // and collect results safely, even if some fail or are skipped.
+        const results = await Promise.allSettled(Array.from(anchorElements).map(async (anchor, index) => {
             try {
-                const linkData = dataProducer(anchor, index);
+                // Await the dataProducer's result
+                const linkData = await dataProducer(anchor, index);
                 if (linkData) {
                     this.updateAnchorToRobustLink(anchor, linkData);
-                    updatedLinks.push(anchor);
+                    return anchor; // Return the updated anchor if successful
                 }
                 else {
                     this.logDebug(`RobustLinksV2: Skipping link "${anchor.href}" as dataProducer returned null/undefined.`);
+                    return null; // Indicate skipped
                 }
             }
             catch (error) {
-                console.error(`RobustLinksV2: Error making link with href "${anchor.href}" robust. Error: ${error.message}`);
+                if (error instanceof Error) {
+                    console.error(`RobustLinksV2: Error making link with href "${anchor.href}" robust. Error: ${error.message}`);
+                }
+                else {
+                    console.error(`RobustLinksV2: An unknown error occurred making link with href "${anchor.href}" robust.`, error);
+                }
+                return null;
+            }
+        }));
+        // Process results from Promise.allSettled
+        results.forEach(result => {
+            if (result.status === 'fulfilled' && result.value !== null) {
+                updatedLinks.push(result.value);
             }
         });
         this.logDebug(`RobustLinksV2: Successfully made ${updatedLinks.length} links robust.`);
@@ -491,7 +511,7 @@ export class RobustLinksV2 {
     }
     // ------ INTERNAL FUNCTIONS --------
     /**
-     * @WIP unfinished function that needs ot
+     * @WIP unfinished function
      *
      * Checks if a link is "rotted" by performing a network request.
      * A link is considered rotted if it returns a non-successful HTTP status code (4xx, 5xx)
@@ -521,7 +541,8 @@ export class RobustLinksV2 {
     _createDefaultDataProducer() {
         return async (anchor, index) => {
             const originalUrl = anchor.href;
-            if (!RobustLinksV2.isValidAbsoluteUrl(originalUrl) || this.isArchiveUrl(originalUrl)) {
+            const isArchiveUrl = this.isArchiveUrl(originalUrl);
+            if (!RobustLinksV2.isValidAbsoluteUrl(originalUrl) || isArchiveUrl) {
                 this.logDebug(`RobustLinksV2: Skipping "${originalUrl}" (invalid or already archive).`);
                 return null;
             }
@@ -603,51 +624,27 @@ export class RobustLinksV2 {
             return;
         }
         this.logDebug('RobustLinksV2: Auto-initialization enabled.');
-        let autoInitSelector = 'a:not([data-originalurl])';
-        let autoInitDataProducer;
-        let autoInitRootElement = undefined;
+        let selector = 'a:not([data-originalurl])';
+        let dataProducer;
+        let rootElement = undefined;
         if (typeof autoInitConfig === 'boolean' && autoInitConfig === true) {
-            autoInitDataProducer = this._createDefaultDataProducer();
+            dataProducer = this._createDefaultDataProducer();
             this.logDebug('RobustLinksV2: Auto-initializing with default selector and data producer.');
         }
         else if (typeof autoInitConfig === 'object') {
-            autoInitSelector = autoInitConfig.selector || autoInitSelector;
-            autoInitRootElement = autoInitConfig.rootElement;
-            if (typeof autoInitConfig.dataProducer === 'function') {
-                // If a custom data producer is provided, it must also be async.
-                autoInitDataProducer = (anchor, index) => {
+            selector = autoInitConfig.selector || selector;
+            rootElement = autoInitConfig.rootElement;
+            if (autoInitConfig.dataProducer) {
+                dataProducer = (anchor, index) => {
                     const producerResult = autoInitConfig.dataProducer.call(this, anchor, index);
-                    // Ensure the result is a Promise
                     return Promise.resolve(producerResult);
                 };
                 this.logDebug('RobustLinksV2: Auto-initializing with specified selector and custom data producer.');
             }
         }
-        if (autoInitDataProducer) {
-            // Wait for archive patterns to load before potentially fetching links
-            await this.getExclusionsReadyPromise();
-            const scope = autoInitRootElement || document.body;
-            const anchorElements = scope.querySelectorAll(autoInitSelector);
-            // Using Promise.all to await all async dataProducer calls
-            const results = await Promise.all(Array.from(anchorElements).map(async (anchor, index) => {
-                try {
-                    const linkData = await autoInitDataProducer(anchor, index); // Type assertion, as we checked if it's defined
-                    if (linkData) {
-                        this.updateAnchorToRobustLink(anchor, linkData);
-                        return anchor;
-                    }
-                    else {
-                        this.logDebug(`RobustLinksV2: Skipping auto-init link "${anchor.href}" as dataProducer returned null/undefined.`);
-                        return null;
-                    }
-                }
-                catch (error) {
-                    console.error(`RobustLinksV2: Error auto-initializing link with href "${anchor.href}". Error: ${error.message}`);
-                    return null;
-                }
-            }));
-            const updatedLinksCount = results.filter(anchor => anchor !== null).length;
-            this.logDebug(`RobustLinksV2: Auto-initialization completed. Robustified ${updatedLinksCount} links.`);
+        if (dataProducer) {
+            const updatedLinks = await this.makeAllLinksRobust(selector, dataProducer, rootElement);
+            this.logDebug(`RobustLinksV2: Auto-initialization completed. Robustified ${updatedLinks.length} links.`);
         }
     }
     /**
@@ -812,8 +809,7 @@ export class RobustLinksV2 {
                 }
             }
             if (newFocusedItem) {
-                // --- CRITICAL CHANGE: ONLY focus the new item. Remove class manipulation. ---
-                newFocusedItem.focus(); // This transfers browser focus
+                newFocusedItem.focus();
                 this.logDebug(`[Dropdown Keydown]: Focused:`, newFocusedItem);
             }
         });

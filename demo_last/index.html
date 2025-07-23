@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robust Links V2 Demo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Placeholder integrity attribute. In a real project, use the actual one from Font Awesome. -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" 
+      integrity="sha512-Fo3rlrZj/k7ujTnHg4CGR2D7kSs0v4LLanw2qksYuRlEzO+tcaEPQogQ0KaoGN26/zrn20ImR1DfuLWnOo7aBA==" 
+      crossorigin="anonymous" 
+      referrerpolicy="no-referrer" />
+    
+    <link rel="stylesheet" href="robustlinks.css"> 
+</head>
+<body class="bg-gray-100 p-4">
+    <div class="container">
+        <h1 class="text-4xl font-bold mb-6">Robust Links V2 Demo</h1>
+        <p class="text-lg text-gray-700 mb-8 text-center">
+            This page demonstrates the functionality of the <code>RobustLinksV2</code> class,
+            specifically using the <code>makeAllLinksRobust</code> method to transform links.
+        </p>
+
+        <h2 class="section-title">Links to be Robustified via <code>makeAllLinksRobust()</code></h2>
+        <p>These links will be explicitly targeted by the <code>makeAllLinksRobust()</code> method and transformed into robust links with dropdowns. The `data-rotted` attribute is used by the `dataProducer` function to decide which links get a simulated Memento URI.</p>
+        <ul class="link-list">
+            <li>
+                <a href="https://example.com/plain-link-1" class="data-robustify">A Plain Link (will become robust)</a>
+                <p class="text-sm text-gray-500 ml-4"><em>(Will be robustified to a Memento URI and get a dropdown)</em></p>
+            </li>
+            <li>
+                <a href="https://example.com/another-plain-link-2" class="data-robustify">Another Plain Link (will become robust)</a>
+                <p class="text-sm text-gray-500 ml-4"><em>(Will be robustified to a Memento URI and get a dropdown)</em></p>
+            </li>
+            <li>
+                <a href="https://example.com/rotted-link-3" class="data-robustify" data-rotted="true">Simulated Rotted Link</a>
+                <p class="text-sm text-gray-500 ml-4"><em>(Will be robustified to a Memento URI and get a dropdown)</em></p>
+            </li>
+            <li>
+                <a href="https://example.com/custom-date-link" class="data-robustify" data-versiondate-override="2022-03-15T10:00:00Z">Link with Custom Archive Date</a>
+                <p class="text-sm text-gray-500 ml-4"><em>(Will be robustified using a specific `versionDate` and get a dropdown)</em></p>
+            </li>
+            <li>
+                <a href="https://www.google.com" class="data-robustify">Google</a>
+                <p class="text-sm text-gray-500 ml-4"><em>(Will be robustified to a Memento URI and get a dropdown)</em></p>
+            </li>
+            <li>
+                <a href="https://www.wikipedia.org" class="data-robustify">Wikipedia</a>
+                <p class="text-sm text-gray-500 ml-4"><em>(Will be robustified to a Memento URI and get a dropdown)</em></p>
+            </li>
+        </ul>
+
+        <h2 class="section-title">Links NOT processed by <code>makeAllLinksRobust()</code></h2>
+        <p>These links will remain as they are, demonstrating that only explicitly targeted links are affected.</p>
+        <ul class="link-list">
+            <li><a href="https://example.com/unaffected-link">An Unaffected Link</a></li>
+            <li><a href="https://web.archive.org/20200515103000/https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404">An Existing Memento URI (unaffected)</a></li>
+            <li><a href="https://perma.cc/AB12-CDEF">An Existing Perma.cc Link (unaffected)</a></li>
+        </ul>
+
+
+        <h2 class="section-title">Console Output</h2>
+        <p>Open your browser's developer console (F12) to see debug messages from the <code>RobustLinksV2</code> class.</p>
+    </div>
+
+    <script type="module">
+        // Import the RobustLinksV2 class from your compiled JS file
+        import { RobustLinksV2 } from './robustlinks2.js'; 
+
+        // Initialize RobustLinksV2 on window load or DOMContentLoaded
+        window.onload = async () => {
+            console.log("Page loaded. Initializing RobustLinksV2...");
+
+            // Create an instance of the RobustLinksV2 class
+            const robustLinks = new RobustLinksV2({
+                debug: true, // Enable debug logging
+                enableDropdown: true, // Enable the dropdown feature
+                dropdownArrowHtml: '<i class="fas fa-chevron-down"></i>', // Font Awesome down arrow
+            });
+
+            // --- Use makeAllLinksRobust to process specific links ---
+            robustLinks.makeAllLinksRobust(
+                'a.data-robustify', // Selector for links to robustify
+                (anchorElement, index) => {
+                    const originalUrl = anchorElement.href;
+                    let versionDate = new Date(); // Default to current date
+
+                    // Allow overriding versionDate for specific test cases
+                    if (anchorElement.dataset.versiondateOverride) {
+                        const parsedDate = new Date(anchorElement.dataset.versiondateOverride);
+                        if (!isNaN(parsedDate.getTime())) {
+                            versionDate = parsedDate;
+                        }
+                    }
+
+                    // Simulate a "rotted" link by always creating a Memento URI
+                    // For a real scenario, you'd check if the link is actually rotted here.
+                    const newHref = robustLinks.createMementoUri(originalUrl, versionDate);
+
+                    return {
+                        originalUrl: originalUrl,
+                        versionDate: versionDate,
+                        newHref: newHref
+                    };
+                }
+            );
+
+            console.log("RobustLinksV2 initialized and links processed using makeAllLinksRobust. Check console for debug messages and interact with links.");
+        };
+    </script>
+</body>
+</html>

@@ -53,12 +53,13 @@ To integrate `RobustLinksV2` into your webpage:
     <body>
         <!-- Your page content -->
 
-        <!-- RobustLinksV2 JavaScript (place before closing </body> for optimal loading) -->
+        <!-- RobustLinksV2 JavaScript and css (place before closing </body> for optimal loading) -->
         <script type="module" src="js/robustlinks2.js"></script>
+        <link rel="stylesheet" href="robustlinks.css"> 
 
         <!-- Your initialization script -->
         <script type="module">
-            import { RobustLinksV2 } from './js/robustlinks2.js'; // Adjust path as needed
+            import { RobustLinksV2 } from './js/robustlinks2.js'; 
 
             document.addEventListener('DOMContentLoaded', () => {
                 // Initialize RobustLinksV2 with your desired configuration
@@ -101,20 +102,6 @@ interface RobustLinksConfig {
  * Serverside fetching for more accurate version dates
  *
  * Configurable fallback for versiondate, other parameters
- *
- * End goal of library:
- * Instantiate class, add a config, and let it go to work
- *
- * Reconstructive-esque page with documentation, github page, and examples
- *
- * Robust Links can check to see how many robustified links are alive or dead
- *
- * Attach an event handler on a higher level element that will reinstantiate after
- * a certain amount of time
- * 
- * Current issue with dataproducer: How complex should it be to use something other than
- * the archve? Right now it takes a lot of coding but it could be nice to just enter an
- * archive name and be done.
 
 ## Add Robust Links To Your Webpages [LEGACY]
 
