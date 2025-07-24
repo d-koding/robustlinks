@@ -730,6 +730,7 @@ export class RobustLinksV2 {
      */
     private async _initAuto(autoInitConfig: RobustLinkTypes.RobustLinksConfig['autoInit']): Promise<void> {
         if (!autoInitConfig) {
+            this.logDebug('RobustLinksV2: Auto-initialization disabled due to no init config.');
             return;
         }
 
@@ -757,6 +758,8 @@ export class RobustLinksV2 {
                     return Promise.resolve(producerResult);
                 };
                 this.logDebug('RobustLinksV2: Auto-initializing with specified selector and custom data producer.');
+            } else {
+                dataProducer = this._createDefaultDataProducer();
             }
         }
 

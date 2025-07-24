@@ -25,15 +25,15 @@
         <p>These links will be explicitly targeted by the <code>makeAllLinksRobust()</code> method and transformed into robust links with dropdowns. The `dataProducer` function decides which links get a simulated Memento URI or are skipped.</p>
         <ul class="link-list">
             <li>
-                <a href="https://example.com/plain-link-1" class="data-robustify">A Plain Link (will become robust)</a>
+                <a href="https://youtube.com" class="data-robustify">Youtube (will become robust)</a>
                 <p class="text-sm text-gray-500 ml-4"><em>(Will be robustified to a Memento URI and get a dropdown)</em></p>
             </li>
             <li>
-                <a href="https://example.com/another-plain-link-2" class="data-robustify">Another Plain Link (will become robust)</a>
+                <a href="https://www.ycombinator.com/about" class="data-robustify">ycombinator (will become robust)</a>
                 <p class="text-sm text-gray-500 ml-4"><em>(Will be robustified to a Memento URI and get a dropdown)</em></p>
             </li>
             <li>
-                <a href="https://example.com/rotted-link-3" class="data-robustify" data-rotted="true">Simulated Rotted Link</a>
+                <a href="https://github.com/" class="data-robustify" data-rotted="true">Github</a>
                 <p class="text-sm text-gray-500 ml-4"><em>(Will be robustified to a Memento URI and get a dropdown)</em></p>
             </li>
             <li>
@@ -45,24 +45,24 @@
                 <p class="text-sm text-gray-500 ml-4"><em>(Will be robustified to a Memento URI and get a dropdown)</em></p>
             </li>
             <li>
-                <a href="https://example.com/encoded%20path/with_params?q=test%20query&id=123" class="data-robustify">Link with Encoded Characters</a>
+                <a href="https://amazon.com/encoded%20path/with_params?q=test%20query&id=123" class="data-robustify">Amazon link with Encoded Characters</a>
                 <p class="text-sm text-gray-500 ml-4"><em>(Should be robustified correctly with encoding preserved)</em></p>
             </li>
             <li>
                 <a href="https://sub.domain.com/path#fragment" class="data-robustify">Link with Subdomain and Fragment</a>
-                <p class="text-sm text-gray-500 ml-4"><em>(Should be robustified, fragment might be dropped by Memento URI)</em></p>
+                <p class="text-sm text-gray-500 ml-4"><em>(Should be robustified, fragment might be dropped by Memento URI -> inspect, will not lead anywhere)</em></p>
             </li>
             <li>
                 <a href="mailto:test@example.com" class="data-robustify">Email Link (should be skipped)</a>
                 <p class="text-sm text-gray-500 ml-4"><em>(Should be skipped as it's not HTTP/HTTPS)</em></p>
             </li>
             <li>
-                <a href="/relative/path/page.html" class="data-robustify">Relative Link (should be skipped)</a>
-                <p class="text-sm text-gray-500 ml-4"><em>(Could be skipped, but because it currently resolves, it will be robustified)</em></p>
+                <a href="/relative/path/page.html" class="data-robustify">Relative Link (could be skipped)</a>
+                <p class="text-sm text-gray-500 ml-4"><em>(Could be skipped, but because it currently resolves, it will be robustified, will not lead anywhere)</em></p>
             </li>
             <li>
                 <a href="http://localhost:8080/dev" class="data-robustify">Localhost Link (should be robustified)</a>
-                <p class="text-sm text-gray-500 ml-4"><em>(Should be robustified if `isValidAbsoluteUrl` allows localhost)</em></p>
+                <p class="text-sm text-gray-500 ml-4"><em>(Should be robustified if `isValidAbsoluteUrl` allows localhost, will not lead anywhere)</em></p>
             </li>
         </ul>
 
@@ -78,10 +78,6 @@
                 </li>
                 <li>
                     <a class="data-robustify" href="https://archive.is/some-old-page">Archive.is (should be skipped)</a>
-                    <p class="text-sm text-gray-500 ml-4"><em>(Could be skipped as an archive link, but doens't exactly match (review with Sawood))</em></p>
-                </li>
-                <li>
-                    <a class="data-robustify" href="https://perma.cc/ABCD-EFGH">Perma.cc (should be skipped)</a>
                     <p class="text-sm text-gray-500 ml-4"><em>(Should be skipped as an archive link)</em></p>
                 </li>
                 <li>
@@ -128,13 +124,6 @@
                 </li>
             </ul>
         </div>
-        <h2 class="section-title">Links NOT processed by <code>makeAllLinksRobust()</code></h2>
-        <p>These links will remain as they are, demonstrating that only explicitly targeted links are affected by the initial robustification call.</p>
-        <ul class="link-list">
-            <li><a href="https://example.com/unaffected-link">An Unaffected Link</a></li>
-            <li><a href="https://web.archive.org/20200515103000/https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404">An Existing Memento URI (unaffected)</a></li>
-            <li><a href="https://perma.cc/AB12-CDEF">An Existing Perma.cc Link (unaffected)</a></li>
-        </ul>
 
 
         <hr class="my-8 border-gray-300">
@@ -279,12 +268,10 @@
                 debug: true, 
                 enableDropdown: true, 
                 dropdownArrowHtml: '<i class="fas fa-chevron-down"></i>',
+                autoInit: {
+                    selector: 'a.data-robustify',
+                },
             });
-
-
-            robustLinksInstance.makeAllLinksRobust(
-                'a.data-robustify', 
-            );
 
             console.log("RobustLinksV2 initialized and links processed using makeAllLinksRobust. Check console for debug messages and interact with links.");
 

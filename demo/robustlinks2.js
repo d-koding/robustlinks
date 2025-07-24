@@ -185,10 +185,11 @@ export class RobustLinksV2 {
     static isValidAbsoluteUrl(url) {
         try {
             const parsedUrl = new URL(url);
-            return (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') &&
-                parsedUrl.hostname.length > 0;
+            // Ensure it's http or https protocol and has a non-empty hostname
+            return (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') && parsedUrl.hostname.length > 0;
         }
         catch (e) {
+            // If URL constructor throws an error, it's not a valid URL
             return false;
         }
     }
@@ -621,6 +622,7 @@ export class RobustLinksV2 {
      */
     async _initAuto(autoInitConfig) {
         if (!autoInitConfig) {
+            this.logDebug('RobustLinksV2: Auto-initialization disabled due to no init config.');
             return;
         }
         this.logDebug('RobustLinksV2: Auto-initialization enabled.');
@@ -640,6 +642,9 @@ export class RobustLinksV2 {
                     return Promise.resolve(producerResult);
                 };
                 this.logDebug('RobustLinksV2: Auto-initializing with specified selector and custom data producer.');
+            }
+            else {
+                dataProducer = this._createDefaultDataProducer();
             }
         }
         if (dataProducer) {
