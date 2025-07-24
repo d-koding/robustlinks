@@ -155,6 +155,167 @@ export class RobustLinksV2 {
 
     // ---- EXTERNAL FUNCTIONS ----
 
+    // ---- CONVERT TO ROBUST LINK ----
+
+    /**
+     * Iterates through all <a> tags matching a given CSS selector and transforms them
+     * into robust links using data provided by a callback function.
+     *
+     * @param selector The CSS selector string (e.g., 'a', 'a.my-class') to select elements.
+     * @param dataProducer A callback function that receives each HTMLAnchorElement and its
+     * index, and returns an object containing the originalUrl, versionDate,
+     * and optional versionSnapshots and newHref for that link.
+     * If the function returns null or undefined, the link is skipped.
+     * @param rootElement The HTML element to search within. @default `document.body`.
+     * @returns An array of HTMLAnchorElement that were successfully made robust.
+     */
+    public async makeAllLinksRobust(
+        selector: string,
+        dataProducer: (anchor: HTMLAnchorElement, index: number) => Promise<{ 
+            originalUrl: string;
+            versionDate: Date;
+            versionSnapshots?: RobustLinkTypes.RobustLinkSnapshot[];
+            newHref?: string;
+        } | null | undefined> | null | undefined, // The null/undefined allows for an explicitly synchronous producer too, but the Promise handles async
+        rootElement?: HTMLElement
+        ): Promise<HTMLAnchorElement[]> {
+            this.logDebug(`RobustLinksV2: Attempting to make all links matching selector "${selector}" robust.`);
+            const updatedLinks: HTMLAnchorElement[] = [];
+            const scope = rootElement || document.body;
+            const anchorElements = scope.querySelectorAll<HTMLAnchorElement>(selector);
+
+            await this.getExclusionsReadyPromise();
+
+            if (!dataProducer) {
+                dataProducer = this._createDefaultDataProducer();
+            }
+
+            // Use Promise.allSettled to handle all async operations concurrently
+            // and collect results safely, even if some fail or are skipped.
+            const results = await Promise.allSettled(
+                Array.from(anchorElements).map(async (anchor, index) => { // Map function is now async
+                    try {
+                        // Await the dataProducer's result
+                        const linkData = await dataProducer(anchor, index);
+                        if (linkData) {
+                            this.updateAnchorToRobustLink(anchor, linkData);
+                            return anchor; // Return the updated anchor if successful
+                        } else {
+                            this.logDebug(`RobustLinksV2: Skipping link "${anchor.href}" as dataProducer returned null/undefined.`);
+                            return null; // Indicate skipped
+                        }
+                    } catch (error: unknown) {
+                        if (error instanceof Error) {
+                            console.error(`RobustLinksV2: Error making link with href "${anchor.href}" robust. Error: ${error.message}`);
+                        } else {
+                            console.error(`RobustLinksV2: An unknown error occurred making link with href "${anchor.href}" robust.`, error);
+                        }
+                        return null; 
+                    }
+                })
+            );
+
+        // Process results from Promise.allSettled
+        results.forEach(result => {
+            if (result.status === 'fulfilled' && result.value !== null) {
+                updatedLinks.push(result.value);
+            }
+        });
+
+        this.logDebug(`RobustLinksV2: Successfully made ${updatedLinks.length} links robust.`);
+        return updatedLinks;
+    }
+
+    /**
+     * Updates an existing HTML <a> element to become a Robust Link by setting
+     * its data-originalurl, data-versiondate, and optionally data-versionurl attributes.
+     * It can also optionally update the href attribute.
+     *
+     * @param anchorElement The HTMLAnchorElement to update.
+     * @param options An object containing the necessary data to make the link robust.
+     * - originalUrl: The URI of the resource that motivates the Robust Link. Must be absolute.
+     * - versionDate: The intended linking datetime.
+     * - versionSnapshots: Optional array of parsed snapshot URIs and their datetimes.
+     * - newHref: Optional string to set as the new href attribute for the anchor.
+     * @throws {Error} if inputs are invalid or required data is missing.
+     */
+    public updateAnchorToRobustLink(
+        anchorElement: HTMLAnchorElement,
+        options: {
+            originalUrl: string;
+            versionDate: Date;
+            versionSnapshots?: RobustLinkTypes.RobustLinkSnapshot[];
+            newHref?: string;
+        }
+    ): void {
+        if (!anchorElement || !(anchorElement instanceof HTMLAnchorElement)) {
+            throw new Error("Invalid anchorElement provided. Must be an HTMLAnchorElement.");
+        }
+        if (!RobustLinksV2.isValidAbsoluteUrl(options.originalUrl)) {
+            throw new Error(`Invalid originalUrl: "${options.originalUrl}" is not an absolute HTTP/HTTPS URI.`);
+        }
+        if (!(options.versionDate instanceof Date) || isNaN(options.versionDate.getTime())) {
+            throw new Error("Invalid versionDate provided. Must be a valid Date object.");
+        }
+
+        if (this.enableDropdown && !anchorElement.dataset.hasRobustDropdown) {
+            this.logDebug("Attaching dropdown");
+            this._attachDropdownToLink(anchorElement, options.originalUrl);
+            anchorElement.dataset.hasRobustDropdown = 'true';
+        }
+
+        anchorElement.setAttribute('data-originalurl', options.originalUrl);
+
+        // Format versionDate to YYYY-MM-DD for data-versiondate attribute
+        const versionDateStr = options.versionDate.toISOString().split('T')[0];
+        anchorElement.setAttribute('data-versiondate', versionDateStr);
+
+        if (options.versionSnapshots && options.versionSnapshots.length > 0) {
+            const snapshotParts = options.versionSnapshots.map(s => `${s.uri}${s.datetime ? ` ${s.datetime}` : ''}`);
+            anchorElement.setAttribute('data-versionurl', snapshotParts.join(' '));
+        } else {
+            anchorElement.removeAttribute('data-versionurl');
+        }
+
+        if (options.newHref) {
+            if (RobustLinksV2.isValidAbsoluteUrl(options.newHref)) {
+                anchorElement.setAttribute('href', options.newHref);
+            } else {
+                this.logDebug(`RobustLinksV2: newHref "${options.newHref}" is not a valid absolute HTTP/HTTPS URL. Href not updated.`);
+            }
+        }
+
+        this.logDebug(`RobustLinksV2: Updated <a> tag with href "${anchorElement.href}" to robust link.`);
+    }
+
+    /**
+     * Generates an HTML <a> tag string for a given ParsedRobustLink object.
+     * This can be used to programmatically create Robust Links for insertion into the DOM.
+     * @param parsedLink The ParsedRobustLink object to convert into HTML.
+     * @returns A string representing the HTML <a> tag.
+     */
+    public createRobustLinkHtml(parsedLink: RobustLinkTypes.ParsedRobustLink): string {
+        // Format versionDate to YYYY-MM-DD for data-versiondate attribute
+        // Note: Date.toISOString() gives YYYY-MM-DDTHH:mm:ss.sssZ, we only want the date part.
+        const versionDateStr = parsedLink.versionDate.toISOString().split('T')[0];
+
+        let versionUrlAttr = '';
+        if (parsedLink.versionSnapshots && parsedLink.versionSnapshots.length > 0) {
+            // Format versionSnapshots into the space-separated string for data-versionurl
+            const snapshotParts = parsedLink.versionSnapshots.map(s => {
+                // Encode URI components to ensure valid HTML attribute value, especially if URIs contain spaces or special chars
+                return `${s.uri}${s.datetime ? ` ${s.datetime}` : ''}`;
+            });
+            versionUrlAttr = ` data-versionurl="${snapshotParts.join(' ')}"`;
+        }
+
+        // Use linkText if provided, otherwise default to href
+        const linkText = parsedLink.linkText || parsedLink.href;
+
+        // Construct the HTML string. Ensure attributes are properly quoted.
+        return `<a href="${parsedLink.href}" data-originalurl="${parsedLink.originalUrl}" data-versiondate="${versionDateStr}"${versionUrlAttr}>${linkText}</a>`;
+    }
+
     /**
      * Generates a Memento URI (URI-M) using the configured `urimPattern`.
      * This method creates a URI that points to a specific historical version
@@ -193,6 +354,8 @@ export class RobustLinksV2 {
 
         return mementoUri;
     }
+
+    // ---- DATA VALIDATION ----
 
     /**
      * Checks if a string is a valid absolute HTTP or HTTPS URL.
@@ -425,34 +588,6 @@ export class RobustLinksV2 {
     }
 
     /**
-     * Generates an HTML <a> tag string for a given ParsedRobustLink object.
-     * This can be used to programmatically create Robust Links for insertion into the DOM.
-     * @param parsedLink The ParsedRobustLink object to convert into HTML.
-     * @returns A string representing the HTML <a> tag.
-     */
-    public createRobustLinkHtml(parsedLink: RobustLinkTypes.ParsedRobustLink): string {
-        // Format versionDate to YYYY-MM-DD for data-versiondate attribute
-        // Note: Date.toISOString() gives YYYY-MM-DDTHH:mm:ss.sssZ, we only want the date part.
-        const versionDateStr = parsedLink.versionDate.toISOString().split('T')[0];
-
-        let versionUrlAttr = '';
-        if (parsedLink.versionSnapshots && parsedLink.versionSnapshots.length > 0) {
-            // Format versionSnapshots into the space-separated string for data-versionurl
-            const snapshotParts = parsedLink.versionSnapshots.map(s => {
-                // Encode URI components to ensure valid HTML attribute value, especially if URIs contain spaces or special chars
-                return `${s.uri}${s.datetime ? ` ${s.datetime}` : ''}`;
-            });
-            versionUrlAttr = ` data-versionurl="${snapshotParts.join(' ')}"`;
-        }
-
-        // Use linkText if provided, otherwise default to href
-        const linkText = parsedLink.linkText || parsedLink.href;
-
-        // Construct the HTML string. Ensure attributes are properly quoted.
-        return `<a href="${parsedLink.href}" data-originalurl="${parsedLink.originalUrl}" data-versiondate="${versionDateStr}"${versionUrlAttr}>${linkText}</a>`;
-    }
-
-    /**
      * Determines if a given URL is considered an "archive URL" based on predefined patterns.
      * This uses the `isKnownArchive` exclusion rule.
      * @param url The URL to check.
@@ -462,136 +597,7 @@ export class RobustLinksV2 {
         return this.exclusions.isKnownArchive(url);
     }
 
-    /**
-     * Updates an existing HTML <a> element to become a Robust Link by setting
-     * its data-originalurl, data-versiondate, and optionally data-versionurl attributes.
-     * It can also optionally update the href attribute.
-     *
-     * @param anchorElement The HTMLAnchorElement to update.
-     * @param options An object containing the necessary data to make the link robust.
-     * - originalUrl: The URI of the resource that motivates the Robust Link. Must be absolute.
-     * - versionDate: The intended linking datetime.
-     * - versionSnapshots: Optional array of parsed snapshot URIs and their datetimes.
-     * - newHref: Optional string to set as the new href attribute for the anchor.
-     * @throws {Error} if inputs are invalid or required data is missing.
-     */
-    public updateAnchorToRobustLink(
-        anchorElement: HTMLAnchorElement,
-        options: {
-            originalUrl: string;
-            versionDate: Date;
-            versionSnapshots?: RobustLinkTypes.RobustLinkSnapshot[];
-            newHref?: string;
-        }
-    ): void {
-        if (!anchorElement || !(anchorElement instanceof HTMLAnchorElement)) {
-            throw new Error("Invalid anchorElement provided. Must be an HTMLAnchorElement.");
-        }
-        if (!RobustLinksV2.isValidAbsoluteUrl(options.originalUrl)) {
-            throw new Error(`Invalid originalUrl: "${options.originalUrl}" is not an absolute HTTP/HTTPS URI.`);
-        }
-        if (!(options.versionDate instanceof Date) || isNaN(options.versionDate.getTime())) {
-            throw new Error("Invalid versionDate provided. Must be a valid Date object.");
-        }
-
-        if (this.enableDropdown && !anchorElement.dataset.hasRobustDropdown) {
-            this.logDebug("Attaching dropdown");
-            this._attachDropdownToLink(anchorElement, options.originalUrl);
-            anchorElement.dataset.hasRobustDropdown = 'true';
-        }
-
-        anchorElement.setAttribute('data-originalurl', options.originalUrl);
-
-        // Format versionDate to YYYY-MM-DD for data-versiondate attribute
-        const versionDateStr = options.versionDate.toISOString().split('T')[0];
-        anchorElement.setAttribute('data-versiondate', versionDateStr);
-
-        if (options.versionSnapshots && options.versionSnapshots.length > 0) {
-            const snapshotParts = options.versionSnapshots.map(s => `${s.uri}${s.datetime ? ` ${s.datetime}` : ''}`);
-            anchorElement.setAttribute('data-versionurl', snapshotParts.join(' '));
-        } else {
-            anchorElement.removeAttribute('data-versionurl');
-        }
-
-        if (options.newHref) {
-            if (RobustLinksV2.isValidAbsoluteUrl(options.newHref)) {
-                anchorElement.setAttribute('href', options.newHref);
-            } else {
-                this.logDebug(`RobustLinksV2: newHref "${options.newHref}" is not a valid absolute HTTP/HTTPS URL. Href not updated.`);
-            }
-        }
-
-        this.logDebug(`RobustLinksV2: Updated <a> tag with href "${anchorElement.href}" to robust link.`);
-    }
-
-    /**
-     * Iterates through all <a> tags matching a given CSS selector and transforms them
-     * into robust links using data provided by a callback function.
-     *
-     * @param selector The CSS selector string (e.g., 'a', 'a.my-class') to select elements.
-     * @param dataProducer A callback function that receives each HTMLAnchorElement and its
-     * index, and returns an object containing the originalUrl, versionDate,
-     * and optional versionSnapshots and newHref for that link.
-     * If the function returns null or undefined, the link is skipped.
-     * @param rootElement The HTML element to search within. @default `document.body`.
-     * @returns An array of HTMLAnchorElement that were successfully made robust.
-     */
-    public async makeAllLinksRobust(
-        selector: string,
-        dataProducer: (anchor: HTMLAnchorElement, index: number) => Promise<{ 
-            originalUrl: string;
-            versionDate: Date;
-            versionSnapshots?: RobustLinkTypes.RobustLinkSnapshot[];
-            newHref?: string;
-        } | null | undefined> | null | undefined, // The null/undefined allows for an explicitly synchronous producer too, but the Promise handles async
-        rootElement?: HTMLElement
-    ): Promise<HTMLAnchorElement[]> {
-        this.logDebug(`RobustLinksV2: Attempting to make all links matching selector "${selector}" robust.`);
-        const updatedLinks: HTMLAnchorElement[] = [];
-        const scope = rootElement || document.body;
-        const anchorElements = scope.querySelectorAll<HTMLAnchorElement>(selector);
-
-         await this.getExclusionsReadyPromise();
-
-        if (!dataProducer) {
-            dataProducer = this._createDefaultDataProducer();
-        }
-
-        // Use Promise.allSettled to handle all async operations concurrently
-        // and collect results safely, even if some fail or are skipped.
-        const results = await Promise.allSettled(
-            Array.from(anchorElements).map(async (anchor, index) => { // Map function is now async
-                try {
-                    // Await the dataProducer's result
-                    const linkData = await dataProducer(anchor, index);
-                    if (linkData) {
-                        this.updateAnchorToRobustLink(anchor, linkData);
-                        return anchor; // Return the updated anchor if successful
-                    } else {
-                        this.logDebug(`RobustLinksV2: Skipping link "${anchor.href}" as dataProducer returned null/undefined.`);
-                        return null; // Indicate skipped
-                    }
-                } catch (error: unknown) {
-                    if (error instanceof Error) {
-                        console.error(`RobustLinksV2: Error making link with href "${anchor.href}" robust. Error: ${error.message}`);
-                    } else {
-                        console.error(`RobustLinksV2: An unknown error occurred making link with href "${anchor.href}" robust.`, error);
-                    }
-                    return null; 
-                }
-            })
-        );
-
-    // Process results from Promise.allSettled
-    results.forEach(result => {
-        if (result.status === 'fulfilled' && result.value !== null) {
-            updatedLinks.push(result.value);
-        }
-    });
-
-    this.logDebug(`RobustLinksV2: Successfully made ${updatedLinks.length} links robust.`);
-    return updatedLinks;
-}
+    // ---- HELPER FUNCTIONS -----
 
     /**
      * Helper to get the promise that resolves when patterns are loaded.
@@ -602,7 +608,54 @@ export class RobustLinksV2 {
     }
     
 
-    // ------ INTERNAL FUNCTIONS --------
+    // ---- INTERNAL FUNCTIONS ----
+
+    /**
+     * Autoinitializes the robust links class based off of a config, selecting specific links to be made
+     * Robust, with custom dropdown arrows. This is now an async function to handle the link checking.
+     * * @private
+     * @returns {null}
+     */
+    private async _initAuto(autoInitConfig: RobustLinkTypes.RobustLinksConfig['autoInit']): Promise<void> {
+        if (!autoInitConfig) {
+            this.logDebug('RobustLinksV2: Auto-initialization disabled due to no init config.');
+            return;
+        }
+
+        this.logDebug('RobustLinksV2: Auto-initialization enabled.');
+
+        let selector: string = 'a:not([data-originalurl])';
+        let dataProducer: ((anchor: HTMLAnchorElement, index: number) => Promise<{
+            originalUrl: string;
+            versionDate: Date;
+            versionSnapshots?: RobustLinkTypes.RobustLinkSnapshot[];
+            newHref?: string;
+        } | null | undefined>) | undefined;
+        let rootElement: HTMLElement | undefined = undefined;
+
+        if (typeof autoInitConfig === 'boolean' && autoInitConfig === true) {
+            dataProducer = this._createDefaultDataProducer();
+            this.logDebug('RobustLinksV2: Auto-initializing with default selector and data producer.');
+        } else if (typeof autoInitConfig === 'object') {
+            selector = autoInitConfig.selector || selector;
+            rootElement = autoInitConfig.rootElement;
+
+            if (autoInitConfig.dataProducer) {
+                dataProducer = (anchor: HTMLAnchorElement, index: number) => {
+                    const producerResult = autoInitConfig.dataProducer!.call(this, anchor, index);
+                    return Promise.resolve(producerResult);
+                };
+                this.logDebug('RobustLinksV2: Auto-initializing with specified selector and custom data producer.');
+            } else {
+                dataProducer = this._createDefaultDataProducer();
+            }
+        }
+
+        if (dataProducer) {
+            const updatedLinks = await this.makeAllLinksRobust(selector, dataProducer, rootElement);
+            this.logDebug(`RobustLinksV2: Auto-initialization completed. Robustified ${updatedLinks.length} links.`);
+        }
+    }
 
     /**
      * @WIP unfinished function 
@@ -718,54 +771,6 @@ export class RobustLinksV2 {
             console.error('RobustLinksV2: Error loading archive exclusion patterns:', error);
             // Decide how to handle this error: maybe proceed without exclusions, or prevent functionality.
             this._archivePatternRegexes = []; // Fail gracefully with empty patterns
-        }
-    }
-
-
-    /**
-     * Autoinitializes the robust links class based off of a config, selecting specific links to be made
-     * Robust, with custom dropdown arrows. This is now an async function to handle the link checking.
-     * * @private
-     * @returns {null}
-     */
-    private async _initAuto(autoInitConfig: RobustLinkTypes.RobustLinksConfig['autoInit']): Promise<void> {
-        if (!autoInitConfig) {
-            this.logDebug('RobustLinksV2: Auto-initialization disabled due to no init config.');
-            return;
-        }
-
-        this.logDebug('RobustLinksV2: Auto-initialization enabled.');
-
-        let selector: string = 'a:not([data-originalurl])';
-        let dataProducer: ((anchor: HTMLAnchorElement, index: number) => Promise<{
-            originalUrl: string;
-            versionDate: Date;
-            versionSnapshots?: RobustLinkTypes.RobustLinkSnapshot[];
-            newHref?: string;
-        } | null | undefined>) | undefined;
-        let rootElement: HTMLElement | undefined = undefined;
-
-        if (typeof autoInitConfig === 'boolean' && autoInitConfig === true) {
-            dataProducer = this._createDefaultDataProducer();
-            this.logDebug('RobustLinksV2: Auto-initializing with default selector and data producer.');
-        } else if (typeof autoInitConfig === 'object') {
-            selector = autoInitConfig.selector || selector;
-            rootElement = autoInitConfig.rootElement;
-
-            if (autoInitConfig.dataProducer) {
-                dataProducer = (anchor: HTMLAnchorElement, index: number) => {
-                    const producerResult = autoInitConfig.dataProducer!.call(this, anchor, index);
-                    return Promise.resolve(producerResult);
-                };
-                this.logDebug('RobustLinksV2: Auto-initializing with specified selector and custom data producer.');
-            } else {
-                dataProducer = this._createDefaultDataProducer();
-            }
-        }
-
-        if (dataProducer) {
-            const updatedLinks = await this.makeAllLinksRobust(selector, dataProducer, rootElement);
-            this.logDebug(`RobustLinksV2: Auto-initialization completed. Robustified ${updatedLinks.length} links.`);
         }
     }
 
