@@ -1,6 +1,6 @@
 # Robust Links V2 [WIP]
 
-Are you an author of web pages and you don't want your links to die? The `RobustLinksV2` library provides a powerful and flexible way to combat "link rot" and "content drift" by augmenting your web links with archival metadata and functionality.
+Are you an author of web pages and you don't want your links to die? The `RobustLinksV2` library provides a way to combat "link rot" and "content drift" by augmenting your web links with archival metadata and functionality.
 
 This library helps ensure that even if an original web resource changes or disappears, visitors to your page can still access a preserved version of the content as it was intended at the time of linking. This is achieved by leveraging the [Memento Time Travel](http://timetravel.mementoweb.org/guide/api/) infrastructure, which aggregates web archives from around the world.
 
@@ -34,43 +34,42 @@ Robust Links enhance standard `<a>` tags with specific `data-*` attributes:
 * `data-versiondate`: The intended date of linking to the resource, representing the state the linker wants the visitor to experience.
 * `data-versionurl`: (Optional) The URI of one or more pre-existing snapshots of the resource, often from a web archive.
 
+Robust Links annotations are always the **explicit choice of the page author**. The library renders and parses annotations that you provide — it does not automatically generate or guess annotations on your behalf. For a full overview of authoring scenarios, see [https://hvdsomp.info/robustlinks/#examples](https://hvdsomp.info/robustlinks/#examples).
+
 ## Installation and Setup
 
-To integrate `RobustLinksV2` into your webpage:
+To integrate `RobustLinksV2` into your webpage, include the JS and CSS **by reference** using the persistent links below. Do not download and bundle these files locally — referencing them directly ensures you always use the canonical version, and that any updates (such as a change to the default TimeGate) are picked up automatically.
 
-1.  **Download the files:** Obtain the compiled `robustlinks2.js` and `robustlinks2.css` files.
-2.  **Place them in your project:** A common setup is to place `robustlinks2.js` in a `js/` directory.
-3.  **Include in your HTML:** Add the following lines to the `<head>` section of your HTML source:
+Add the following lines to your HTML:
 
-    ```html
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>My Robust Links Page</title>
-    </head>
-    <body>
-        <!-- Your page content -->
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Robust Links Page</title>
 
-        <!-- RobustLinksV2 JavaScript and css (place before closing </body> for optimal loading) -->
-        <script type="module" src="js/robustlinks2.js"></script>
-        <link rel="stylesheet" href="robustlinks.css"> 
+    <!-- RobustLinks CSS -->
+    <link rel="stylesheet" type="text/css" href="https://doi.org/10.25776/z58z-r575" />
+    <!-- RobustLinks JavaScript -->
+    <script type="text/javascript" src="https://doi.org/10.25776/h1fa-7a28"></script>
+</head>
+<body>
+    <!-- Your page content with robust links -->
 
-        <!-- Your initialization script -->
-        <script type="module">
-            import { RobustLinksV2 } from './js/robustlinks2.js'; 
+    <script type="module">
+        import { RobustLinksV2 } from 'https://doi.org/10.25776/h1fa-7a28';
 
-            document.addEventListener('DOMContentLoaded', () => {
-                // Initialize RobustLinksV2 with your desired configuration
-                new RobustLinksV2({
-                    // Your configuration options go here (see below)
-                });
+        document.addEventListener('DOMContentLoaded', () => {
+            const rl = new RobustLinksV2({
+                // Your configuration options go here (see below)
             });
-        </script>
-    </body>
-    </html>
-    ```
+        });
+    </script>
+</body>
+</html>
+```
 
 ## RobustLinksConfig Options
 
@@ -78,57 +77,43 @@ The `RobustLinksV2` class is initialized with a configuration object (`RobustLin
 
 ```typescript
 interface RobustLinksConfig {
-    id?: string; // An identifier for the RobustLinksV2 instance.
-    debug?: boolean; // Enables debug logging to the console. Defaults to `false`.
-    timeGate?: string; // The base URL for the Memento TimeGate. Defaults to "[https://web.archive.org/](https://web.archive.org/)".
-    enableDropdown?: boolean; // Enables or disables the dropdown menu for robustified links. Defaults to `false`.
-    dropdownArrowColor?: string; // The color of the dropdown arrow icon (influences CSS). Defaults to "#333".
-    dropdownArrowSize?: string; // The size (e.g., "1em", "12px") of the dropdown arrow icon (influences CSS). Defaults to "6px".
-    dropdownArrowHtml?: string; // Custom HTML string to use for the dropdown arrow icon (e.g., SVG markup). If not provided, a Unicode arrow (▼) is used.
-    autoInit?: boolean | { // Enables or configures automatic robust link creation on initialization. Defaults to `true`.
-        selector?: string; // CSS selector for links to robustify. Defaults to `a:not([data-originalurl])`.
-        rootElement?: HTMLElement; // The DOM element to search within. Defaults to `document.body`.
-        dataProducer?: (anchor: HTMLAnchorElement, index: number) => { // Custom function to provide robust link data.
-            originalUrl: string;
-            versionDate: Date;
-            versionSnapshots?: RobustLinkSnapshot[];
-            newHref?: string;
-        } | null | undefined;
-    };
+    debug?: boolean;           // Enables debug logging to the console. Defaults to false.
+    timeGate?: string;         // The base URL for the Memento TimeGate. Defaults to "https://web.archive.org/".
+    enableDropdown?: boolean;  // Enables the dropdown menu on robustified links. Defaults to false.
+    dropdownArrowColor?: string; // Color of the dropdown arrow. Defaults to "#333".
+    dropdownArrowSize?: string;  // Size of the dropdown arrow (e.g. "12px"). Defaults to "12px".
+    dropdownArrowHtml?: string;  // Custom HTML for the dropdown arrow. Defaults to "▼".
 }
 ```
 
-## FUTURE WORK
- * Serverside fetching for more accurate version dates
- *
- * Configurable fallback for versiondate, other parameters
+## Authoring Robust Links
 
-## Add Robust Links To Your Webpages [LEGACY]
-
-Simply append the following lines to the `<head>` section of your HTML source:
+A robust link is a standard `<a>` tag with `data-originalurl` and `data-versiondate` attributes set by the page author:
 
 ```html
-<!-- RobustLinks CSS -->
-<link rel="stylesheet" type="text/css" href="https://doi.org/10.25776/z58z-r575" />
-<!-- RobustLinks Javascript -->
-<script type="text/javascript" src="https://doi.org/10.25776/h1fa-7a28"></script>
+<a href="https://web.archive.org/web/20231026/https://example.com"
+   data-originalurl="https://example.com"
+   data-versiondate="2023-10-26">
+    Example
+</a>
 ```
 
-## RobustLinks Menu [LEGACY]
+The `data-versionurl` attribute is optional and can list one or more specific snapshots:
 
-After adding the Robust Links JavaScript source to your HTML file, a new link icon will appear next to all the robustified links in the page. Clicking the down arrow in this icon will pop up a menu with the following items:
+```html
+<a href="https://web.archive.org/web/20231026143000/https://example.com"
+   data-originalurl="https://example.com"
+   data-versiondate="2023-10-26"
+   data-versionurl="https://web.archive.org/web/20231026143000/https://example.com 2023-10-26">
+    Example
+</a>
+```
 
-* `Current version of page`: Clicking this menu item will take you to the original url provided in the `data-originalurl` attribute.
+For a full range of authoring scenarios see [https://hvdsomp.info/robustlinks/#examples](https://hvdsomp.info/robustlinks/#examples).
 
-* `Version archived on <date>`: Clicking this menu item will redirect you to the memento url provided in the `data-versionurl` attribute.
+## FUTURE WORK
+* Server-side fetching for more accurate version dates
+* Configurable fallback for versiondate and other parameters
 
-* `Version archived near <date>`: When clicking this menu item, the JavaScript library will use the datetime provided in the `data-versiondate` attribute along with the original url and redirect you to the closest memento around that datetime using the [Memento Time Travel](http://timetravel.mementoweb.org/guide/api/) service.
-
-
-## Example [LEGACY]
-- [Before](http://robustlinks.mementoweb.org/demo/uri_references.html)
-- [After](http://robustlinks.mementoweb.org/demo/uri_references_js.html)
-
-## License [LEGACY]
+## License
 See the [license](http://mementoweb.github.io/SiteStory/license.html).
-

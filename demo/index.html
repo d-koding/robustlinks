@@ -10,215 +10,120 @@
       integrity="sha512-Fo3rlrZj/k7ujTnHg4CGR2D7kSs0v4LLanw2qksYuRlEzO+tcaEPQogQ0KaoGN26/zrn20ImR1DfuLWnOo7aBA==" 
       crossorigin="anonymous" 
       referrerpolicy="no-referrer" />
-    
-    <link rel="stylesheet" href="robustlinks.css"> 
+
+    <!-- RobustLinks CSS — included by reference, do not replace with a local copy -->
+    <link rel="stylesheet" type="text/css" href="https://doi.org/10.25776/z58z-r575" />
 </head>
 <body class="bg-gray-100 p-4">
     <div class="container">
         <h1 class="text-4xl font-bold mb-6">Robust Links V2 Demo</h1>
         <p class="text-lg text-gray-700 mb-8 text-center">
-            This page demonstrates the functionality of the <code>RobustLinksV2</code> class,
-            specifically using the <code>makeAllLinksRobust</code> method to transform links.
+            This page demonstrates how the <code>RobustLinksV2</code> library renders
+            pre-configured robust links — links that have been explicitly annotated by the
+            page author with <code>data-originalurl</code> and <code>data-versiondate</code> attributes.
+        </p>
+        <p class="text-md text-gray-600 mb-8 text-center">
+            Robust Links annotations are always the deliberate choice of the page author.
+            This library renders and parses annotations you provide — it does not automatically
+            generate or guess annotations on your behalf. See
+            <a href="https://hvdsomp.info/robustlinks/#examples" class="text-blue-600 underline">hvdsomp.info/robustlinks/#examples</a>
+            for the full range of authoring scenarios.
         </p>
 
-        <h2 class="section-title">Links to be Robustified via <code>makeAllLinksRobust()</code></h2>
-        <p>These links will be explicitly targeted by the <code>makeAllLinksRobust()</code> method and transformed into robust links with dropdowns. The `dataProducer` function decides which links get a simulated Memento URI or are skipped.</p>
-        <ul class="link-list">
-            <li>
-                <a href="https://youtube.com" class="data-robustify">Youtube (will become robust)</a>
-                <p class="text-sm text-gray-500 ml-4"><em>(Will be robustified to a Memento URI and get a dropdown)</em></p>
-            </li>
-            <li>
-                <a href="https://www.ycombinator.com/about" class="data-robustify">ycombinator (will become robust)</a>
-                <p class="text-sm text-gray-500 ml-4"><em>(Will be robustified to a Memento URI and get a dropdown)</em></p>
-            </li>
-            <li>
-                <a href="https://github.com/" class="data-robustify" data-rotted="true">Github</a>
-                <p class="text-sm text-gray-500 ml-4"><em>(Will be robustified to a Memento URI and get a dropdown)</em></p>
-            </li>
-            <li>
-                <a href="https://www.google.com" class="data-robustify">Google</a>
-                <p class="text-sm text-gray-500 ml-4"><em>(Will be robustified to a Memento URI and get a dropdown)</em></p>
-            </li>
-            <li>
-                <a href="https://www.wikipedia.org" class="data-robustify">Wikipedia</a>
-                <p class="text-sm text-gray-500 ml-4"><em>(Will be robustified to a Memento URI and get a dropdown)</em></p>
-            </li>
-            <li>
-                <a href="https://amazon.com/encoded%20path/with_params?q=test%20query&id=123" class="data-robustify">Amazon link with Encoded Characters</a>
-                <p class="text-sm text-gray-500 ml-4"><em>(Should be robustified correctly with encoding preserved)</em></p>
-            </li>
-            <li>
-                <a href="https://sub.domain.com/path#fragment" class="data-robustify">Link with Subdomain and Fragment</a>
-                <p class="text-sm text-gray-500 ml-4"><em>(Should be robustified, fragment might be dropped by Memento URI -> inspect, will not lead anywhere)</em></p>
-            </li>
-            <li>
-                <a href="mailto:test@example.com" class="data-robustify">Email Link (should be skipped)</a>
-                <p class="text-sm text-gray-500 ml-4"><em>(Should be skipped as it's not HTTP/HTTPS)</em></p>
-            </li>
-            <li>
-                <a href="/relative/path/page.html" class="data-robustify">Relative Link (could be skipped)</a>
-                <p class="text-sm text-gray-500 ml-4"><em>(Could be skipped, but because it currently resolves, it will be robustified, will not lead anywhere)</em></p>
-            </li>
-            <li>
-                <a href="http://localhost:8080/dev" class="data-robustify">Localhost Link (should be robustified)</a>
-                <p class="text-sm text-gray-500 ml-4"><em>(Should be robustified if `isValidAbsoluteUrl` allows localhost, will not lead anywhere)</em></p>
-            </li>
-        </ul>
-
-        <h2 class="section-title">Archive Exclusion Test Cases</h2>
-        <p>These links are specifically designed to test the `archiveExclusions.json` patterns. Check console logs to see if they are skipped.</p>
-        
-        <div class="link-section">
-            <h3>Links that SHOULD NOT be Robustified (Are Archive URLs):</h3>
-            <ul class="link-list">
-                <li>
-                    <a class="data-robustify" href="https://web.archive.org/web/20230101000000/http://example.com/">Web Archive Org (should be skipped)</a>
-                    <p class="text-sm text-gray-500 ml-4"><em>(Should be skipped as an archive link)</em></p>
-                </li>
-                <li>
-                    <a class="data-robustify" href="https://archive.is/some-old-page">Archive.is (should be skipped)</a>
-                    <p class="text-sm text-gray-500 ml-4"><em>(Should be skipped as an archive link)</em></p>
-                </li>
-                <li>
-                    <a class="data-robustify" href="https://archive.li/2022/something">Archive.li (should be skipped)</a>
-                    <p class="text-sm text-gray-500 ml-4"><em>(Should be skipped as an archive link)</em></p>
-                </li>
-                <li>
-                    <a class="data-robustify" href="https://wayback.archive-it.org/all/2020/some-resource">Archive-It (should be skipped)</a>
-                    <p class="text-sm text-gray-500 ml-4"><em>(Should be skipped as an archive link)</em></p>
-                </li>
-                <li>
-                    <a class="data-robustify" href="https://www.webarchive.org.uk/wayback/en/archive/foo">UK Web Archive (should be skipped)</a>
-                    <p class="text-sm text-gray-500 ml-4"><em>(Should be skipped as an archive link)</em></p>
-                </li>
-                <li>
-                    <a class="data-robustify" href="https://webarchive.parliament.uk/20230101000000/">Parliament Archive (should be skipped)</a>
-                    <p class="text-sm text-gray-500 ml-4"><em>(Should be skipped as an archive link)</em></p>
-                </li>
-                <li>
-                    <a class="data-robustify" href="https://webarchive.nationalarchives.gov.uk/123456789/">National Archives (should be skipped)</a>
-                    <p class="text-sm text-gray-500 ml-4"><em>(Should be skipped as an archive link)</em></p>
-                </li>
-                <li>
-                    <a class="data-robustify" href="https://haw.nsk.hr/arhiva/some_path">Croatian Web Archive (should be skipped)</a>
-                    <p class="text-sm text-gray-500 ml-4"><em>(Should be skipped as an archive link)</em></p>
-                </li>
-            </ul>
-        </div>
-
-        <div class="link-section">
-            <h3>Links that SHOULD be Robustified (Are NOT Archive URLs):</h3>
-            <ul class="link-list">
-                <li>
-                    <a class="data-robustify" href="https://example.com/not-archive-1">Not Archive Link 1 (should robustify)</a>
-                    <p class="text-sm text-gray-500 ml-4"><em>(Should be robustified, not matching any exclusion)</em></p>
-                </li>
-                <li>
-                    <a class="data-robustify" href="https://google.com/search">Not Archive Link 2 (should robustify)</a>
-                    <p class="text-sm text-gray-500 ml-4"><em>(Should be robustified, not matching any exclusion)</em></p>
-                </li>
-                <li>
-                    <a class="data-robustify" href="https://mywebsite.org/a/page">Not Archive Link 3 (should robustify)</a>
-                    <p class="text-sm text-gray-500 ml-4"><em>(Should be robustified, not matching any exclusion)</em></p>
-                </li>
-            </ul>
-        </div>
-
-
-        <hr class="my-8 border-gray-300">
-
-        <h2 class="section-title">Demonstrating `findAndParseRobustLinks()`</h2>
-        <p>This section contains pre-configured robust links. The <code>findAndParseRobustLinks()</code> method will scan the document for these links and extract their robust link data, which will then be displayed below. Check the console for errors/warnings from parsing.</p>
+        <h2 class="section-title">Pre-Configured Robust Links</h2>
+        <p class="mb-4">The links below have been explicitly annotated by the page author. The <code>findAndParseRobustLinks()</code> method scans the document for these links and extracts their robust link data. Click "Parse Links Now" to see the parsed output. Check the browser console for any parsing warnings or errors.</p>
 
         <ul class="link-list">
             <li>
-                <a href="https://web.archive.org/20231026120000/https://example.com/parsed-link-1" 
-                   data-originalurl="https://example.com/parsed-link-1" 
-                   data-versiondate="2023-10-26T12:00:00Z"
-                   data-versionurl="https://archive.is/20231026120000/https://example.com/parsed-link-1 20231026120000 https://perma.cc/A1B2-C3D4">
-                    Pre-configured Robust Link 1 (Multiple Snapshots)
+                <a href="https://web.archive.org/web/20231026120000/https://www.nasa.gov/"
+                   data-originalurl="https://www.nasa.gov/"
+                   data-versiondate="2023-10-26"
+                   data-versionurl="https://web.archive.org/web/20231026120000/https://www.nasa.gov/ 20231026120000">
+                    NASA Homepage (October 2023)
                 </a>
+                <p class="text-sm text-gray-500 ml-4"><em>(Single snapshot, ISO8601 date)</em></p>
             </li>
             <li>
-                <a href="https://web.archive.org/20220101000000/https://another.example.com/parsed-link-2" 
-                   data-originalurl="https://another.example.com/parsed-link-2" 
-                   data-versiondate="20220101000000"
-                   data-versionurl="https://snapshot.example.net/20220101000000/another.html 20220101000000">
-                    Pre-configured Robust Link 2 (WA Date, one snapshot)
+                <a href="https://web.archive.org/web/20230101120000/https://www.nasa.gov/missions/artemis/"
+                   data-originalurl="https://www.nasa.gov/missions/artemis/"
+                   data-versiondate="20230101120000"
+                   data-versionurl="https://web.archive.org/web/20230101120000/https://www.nasa.gov/missions/artemis/ 20230101120000 https://web.archive.org/web/20221201120000/https://www.nasa.gov/missions/artemis/ 20221201120000">
+                    NASA Artemis Mission Page (January 2023)
                 </a>
+                <p class="text-sm text-gray-500 ml-4"><em>(Multiple snapshots, Web Archive URI datetime)</em></p>
             </li>
             <li>
-                <a href="https://web.archive.org/20240723114205/https://simple.example.com/parsed-link-3"
-                   data-originalurl="https://simple.example.com/parsed-link-3"
-                   data-versiondate="2024-07-23">
-                   Pre-configured Robust Link 3 (ISO8601 Date only, no snapshots)
+                <a href="https://web.archive.org/web/20240101000000/https://www.nasa.gov/humans-in-space/international-space-station/"
+                   data-originalurl="https://www.nasa.gov/humans-in-space/international-space-station/"
+                   data-versiondate="2024-01-01">
+                    NASA International Space Station Page (January 2024)
                 </a>
+                <p class="text-sm text-gray-500 ml-4"><em>(No snapshots, ISO8601 date only)</em></p>
             </li>
             <li>
-                <a href="https://web.archive.org/20210501/https://weird.example.com/path"
-                   data-originalurl="https://weird.example.com/path"
-                   data-versiondate="2021-05-01"
-                   data-versionurl="https://snapshot.example.com/123 20210501000000 invalid-url another-valid.com 20210501000000">
-                    Link with Mixed Valid/Invalid `data-versionurl`
+                <a href="https://web.archive.org/web/20231015000000/https://www.nasa.gov/solar-system/planets/mars/"
+                   data-originalurl="https://www.nasa.gov/solar-system/planets/mars/"
+                   data-versiondate="2023-10-15"
+                   data-versionurl="https://web.archive.org/web/20231015000000/https://www.nasa.gov/solar-system/planets/mars/ 20231015000000 invalid-url https://web.archive.org/web/20230901000000/https://www.nasa.gov/solar-system/planets/mars/ 20230901000000">
+                    NASA Mars Page — Mixed Valid/Invalid <code>data-versionurl</code>
                 </a>
-                <p class="text-sm text-gray-500 ml-4"><em>(Should parse valid snapshots, warn about invalid ones in console)</em></p>
+                <p class="text-sm text-gray-500 ml-4"><em>(Valid snapshots parsed, invalid URL warned in console)</em></p>
             </li>
             <li>
-                <a href="https://web.archive.org/20200202/https://spaced.example.com"
-                   data-originalurl="https://spaced.example.com"
-                   data-versiondate="20200202"
-                   data-versionurl="  https://archive.org/spaced 20200202000000    https://perma.cc/other-spaced   20200202000000  ">
-                    Link with Excessive Spaces in `data-versionurl`
+                <a href="https://web.archive.org/web/20220601120000/https://www.nasa.gov/james-webb-space-telescope/"
+                   data-originalurl="https://www.nasa.gov/james-webb-space-telescope/"
+                   data-versiondate="20220601"
+                   data-versionurl="  https://web.archive.org/web/20220601120000/https://www.nasa.gov/james-webb-space-telescope/ 20220601120000    https://web.archive.org/web/20220301120000/https://www.nasa.gov/james-webb-space-telescope/   20220301120000  ">
+                    NASA James Webb Space Telescope Page — Excessive Spaces in <code>data-versionurl</code>
                 </a>
-                <p class="text-sm text-gray-500 ml-4"><em>(Should handle multiple spaces correctly)</em></p>
+                <p class="text-sm text-gray-500 ml-4"><em>(Multiple spaces in attribute handled correctly)</em></p>
             </li>
             <li>
-                <a href="https://example.com/missing-original" 
+                <a href="https://web.archive.org/web/20231101000000/https://www.nasa.gov/history/"
+                   data-versiondate="2023-11-01">
+                    NASA History Page — Missing <code>data-originalurl</code> (defaults to href)
+                </a>
+                <p class="text-sm text-gray-500 ml-4"><em>(Per spec Section 3.5: <code>originalUrl</code> defaults to <code>href</code>)</em></p>
+            </li>
+            <li>
+                <a href="https://web.archive.org/web/20231101000000/https://www.nasa.gov/earth/"
+                   data-originalurl="https://www.nasa.gov/earth/">
+                    NASA Earth Page — Missing <code>data-versiondate</code> (will error)
+                </a>
+                <p class="text-sm text-gray-500 ml-4"><em>(Error logged and link skipped in parsing)</em></p>
+            </li>
+            <li>
+                <a href="/relative/href"
+                   data-originalurl="https://www.nasa.gov/"
                    data-versiondate="2023-01-01">
-                    Link with Missing `data-originalurl` (should use href as default)
+                    Relative <code>href</code> (will error)
                 </a>
-                <p class="text-sm text-gray-500 ml-4"><em>(Should default `originalUrl` to `href` and parse successfully)</em></p>
+                <p class="text-sm text-gray-500 ml-4"><em>(Error logged because <code>href</code> is not absolute)</em></p>
             </li>
             <li>
-                <a href="https://example.com/missing-date" 
-                   data-originalurl="https://example.com/missing-date">
-                    Link with Missing `data-versiondate` (should error)
+                <a href="https://web.archive.org/web/20231101000000/https://www.nasa.gov/missions/"
+                   data-originalurl="ftp://www.nasa.gov/missions/"
+                   data-versiondate="2023-11-01">
+                    FTP <code>data-originalurl</code> (will error)
                 </a>
-                <p class="text-sm text-gray-500 ml-4"><em>(Should log an error and be skipped in parsing)</em></p>
+                <p class="text-sm text-gray-500 ml-4"><em>(Error logged because <code>data-originalurl</code> is not HTTP/HTTPS)</em></p>
             </li>
             <li>
-                <a href="/relative/href-error" 
-                   data-originalurl="https://example.com/valid-original" 
-                   data-versiondate="2023-03-03">
-                    Link with Invalid `href` (relative, should error)
+                <a href="https://web.archive.org/web/20231101000000/https://www.nasa.gov/aeronautics/"
+                   data-originalurl="https://www.nasa.gov/aeronautics/"
+                   data-versiondate="2023/11/01">
+                    Malformed <code>data-versiondate</code> (will error)
                 </a>
-                <p class="text-sm text-gray-500 ml-4"><em>(Should log an error because `href` is not absolute)</em></p>
-            </li>
-             <li>
-                <a href="https://example.com/invalid-originalurl" 
-                   data-originalurl="ftp://invalid.original.com" 
-                   data-versiondate="2023-04-04">
-                    Link with Invalid `data-originalurl` (FTP, should error)
-                </a>
-                <p class="text-sm text-gray-500 ml-4"><em>(Should log an error because `data-originalurl` is not HTTP/HTTPS)</em></p>
+                <p class="text-sm text-gray-500 ml-4"><em>(Error logged — slashes are not a valid date format)</em></p>
             </li>
             <li>
-                <a href="https://example.com/invalid-versiondate" 
-                   data-originalurl="https://example.com/invalid-versiondate" 
-                   data-versiondate="2023/05/05">
-                    Link with Invalid `data-versiondate` format (should error)
-                </a>
-                <p class="text-sm text-gray-500 ml-4"><em>(Should log an error due to malformed date)</em></p>
-            </li>
-            <li>
-                <a href="https://example.com/empty-data-versionurl" 
-                   data-originalurl="https://example.com/empty-data-versionurl" 
-                   data-versiondate="2023-06-06"
+                <a href="https://web.archive.org/web/20231101000000/https://www.nasa.gov/technology/"
+                   data-originalurl="https://www.nasa.gov/technology/"
+                   data-versiondate="2023-11-01"
                    data-versionurl="">
-                    Link with Empty `data-versionurl`
+                    NASA Technology Page — Empty <code>data-versionurl</code>
                 </a>
-                <p class="text-sm text-gray-500 ml-4"><em>(Should parse with empty `versionSnapshots` array)</em></p>
+                <p class="text-sm text-gray-500 ml-4"><em>(Parsed with empty <code>versionSnapshots</code> array)</em></p>
             </li>
         </ul>
 
@@ -234,20 +139,18 @@
         <p>Open your browser's developer console (F12) to see debug messages from the <code>RobustLinksV2</code> class, especially for skipped or errored links.</p>
     </div>
 
+    <!-- RobustLinks JavaScript — included by reference, do not replace with a local copy -->
     <script type="module">
-        // Import the RobustLinksV2 class from your compiled JS file
-        import { RobustLinksV2 } from './robustlinks2.js'; 
+        import { RobustLinksV2 } from 'https://doi.org/10.25776/h1fa-7a28';
 
-        let robustLinksInstance; // Declare a variable to hold the RobustLinksV2 instance
+        let robustLinksInstance;
 
-        // Function to parse and display links
         function parseAndDisplayLinks() {
             console.log("Attempting to find and parse existing robust links...");
             const parsedLinks = robustLinksInstance.findAndParseRobustLinks();
             const outputDiv = document.getElementById('parsedLinksOutput');
 
             if (parsedLinks.length > 0) {
-                // Use JSON.stringify with a replacer to convert Date objects to ISO strings for better readability
                 outputDiv.innerHTML = '<pre>' + JSON.stringify(parsedLinks, (key, value) => {
                     if (value instanceof Date) {
                         return value.toISOString();
@@ -260,24 +163,16 @@
             console.log(`Found and parsed ${parsedLinks.length} robust links.`);
         }
 
-        window.onload = async () => {
+        window.onload = () => {
             console.log("Page loaded. Initializing RobustLinksV2...");
 
-            // Create an instance of the RobustLinksV2 class
-            robustLinksInstance = new RobustLinksV2({ // Assign to the global variable
-                debug: true, 
-                enableDropdown: true, 
+            robustLinksInstance = new RobustLinksV2({
+                debug: true,
+                enableDropdown: true,
                 dropdownArrowHtml: '<i class="fas fa-chevron-down"></i>',
-                autoInit: {
-                    selector: 'a.data-robustify',
-                },
             });
 
-            console.log("RobustLinksV2 initialized and links processed using makeAllLinksRobust. Check console for debug messages and interact with links.");
-
-            // --- Attach event listener to the new button ---
-            const parseButton = document.getElementById('parseLinksButton');
-            parseButton.addEventListener('click', parseAndDisplayLinks);
+            document.getElementById('parseLinksButton').addEventListener('click', parseAndDisplayLinks);
         };
     </script>
 </body>
